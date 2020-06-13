@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Core">
+      <UniqueIdentifier>{511469ea-b0b3-4e0b-b809-057bcb484798}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Replay">
+      <UniqueIdentifier>{fe666dbe-dc07-471d-bd09-69f5ed78b172}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Util">
+      <UniqueIdentifier>{1aee600d-3a5b-47c8-b1a0-0482510fe952}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Function Wrappers">
+      <UniqueIdentifier>{b7b3ff97-0177-459b-a8b8-29a371b42d68}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="gxm_driver.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="gxm_replay.h">
+      <Filter>Replay</Filter>
+    </ClInclude>
+    <ClInclude Include="gxm_common.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="official\gxm.h" />
+    <ClInclude Include="official\types.h" />
+    <ClInclude Include="gxm_resources.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="gxm_driver.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="gxm_replay.cpp">
+      <Filter>Replay</Filter>
+    </ClCompile>
+    <ClCompile Include="wrappers\gxm_buffer_funcs.cpp">
+      <Filter>Function Wrappers</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

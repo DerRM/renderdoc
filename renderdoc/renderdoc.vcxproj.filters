@@ -139,6 +139,9 @@
     <Filter Include="OS\Posix\GGP">
       <UniqueIdentifier>{b76c42f4-d523-4417-a474-56d278d35a36}</UniqueIdentifier>
     </Filter>
+    <Filter Include="PSVita">
+      <UniqueIdentifier>{5cd1b111-d024-4b78-83de-35e91f377390}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="maths\camera.h">
@@ -503,6 +506,9 @@
     </ClInclude>
     <ClInclude Include="common\formatting.h">
       <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="psvita\vita.h">
+      <Filter>PSVita</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -886,6 +892,9 @@
     </ClCompile>
     <ClCompile Include="maths\vec.cpp">
       <Filter>Common\Maths</Filter>
+    </ClCompile>
+    <ClCompile Include="psvita\vita.cpp">
+      <Filter>PSVita</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
