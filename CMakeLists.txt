@@ -455,6 +455,10 @@ if(ENABLE_RENDERDOCCMD)
     add_subdirectory(renderdoccmd)
 endif()
 
+if(ENABLE_RENDERDOCVITA)
+    add_subdirectory(renderdocvita)
+endif()
+
 # install documentation files
 install (FILES util/LINUX_DIST_README DESTINATION share/doc/renderdoc RENAME README)
 install (FILES LICENSE.md DESTINATION share/doc/renderdoc)

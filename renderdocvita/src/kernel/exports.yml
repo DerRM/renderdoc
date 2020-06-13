@@ -1,0 +1,15 @@
+vita_hook_kernel:
+  attributes: 0
+  version:
+    major: 1
+    minor: 0
+  main:
+    start: module_start
+    stop: module_stop
+  modules:
+    vita_hook_kernel:
+      syscall: true
+      functions:
+        - vitaHookStartApp
+        - vitaHookInstallHooks
+        - vitaHookSetCurrentTitle
