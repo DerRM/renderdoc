@@ -1,4 +1,6 @@
+if(NOT VITA)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 
 set(RDOC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(RDOC_DEFINITIONS PRIVATE -DRENDERDOC_EXPORTS)
@@ -87,6 +89,23 @@ elseif(UNIX)
         list(APPEND RDOC_LIBRARIES
             PRIVATE -l${PKG_WAYLAND_LIBRARIES})
     endif()
+elseif(VITA)
+    list(APPEND RDOC_LIBRARIES
+        PRIVATE m
+        PRIVATE stdc++
+        PRIVATE SceLibKernel_stub
+        PRIVATE SceSysmem_stub
+        PRIVATE SceProcessmgr_stub
+        PRIVATE SceKernelThreadMgr_stub
+        PRIVATE SceIofilemgr_stub
+        PRIVATE SceRtc_stub
+        PRIVATE SceNetCtl_stub_weak
+        PRIVATE SceNet_stub_weak
+        PRIVATE SceSysmodule_stub
+        PRIVATE c
+        PRIVATE gcc
+        PRIVATE stdc++
+        )
 endif()
 
 if(NOT "x${CMAKE_THREAD_LIBS_INIT}" STREQUAL "x")
@@ -329,6 +348,15 @@ elseif(UNIX)
         os/posix/posix_stringio.cpp
         os/posix/posix_threading.cpp
         os/posix/posix_specific.h)
+elseif(VITA)
+    list(APPEND sources
+        os/vita/vita_network.cpp
+        os/vita/vita_threading.cpp
+        os/vita/vita_stringio.cpp
+        os/vita/vita_process.cpp
+        os/vita/vita_callstack.cpp
+        os/vita/vita_hook.cpp
+        os/vita/vita_libentry.cpp)
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX)
@@ -340,8 +368,13 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR APPLE)
     set_source_files_properties(3rdparty/tinyexr/tinyexr.cpp
         PROPERTIES COMPILE_FLAGS "-Wno-extra -Wno-unused-function")
 
-    set_source_files_properties(3rdparty/miniz/miniz.c
-        PROPERTIES COMPILE_FLAGS "-Wno-attributes")
+    if (VITA)
+        set_source_files_properties(3rdparty/miniz/miniz.c
+            PROPERTIES COMPILE_FLAGS "-Wno-attributes -DMINIZ_NO_TIME")
+    else()
+        set_source_files_properties(3rdparty/miniz/miniz.c
+            PROPERTIES COMPILE_FLAGS "-Wno-attributes")
+    endif()
 
     # Need to add -Wno-unknown-warning-option since some clang versions don't have
     # -Wno-shift-negative-value available
@@ -528,7 +561,11 @@ else()
     list(APPEND RDOC_LIBRARIES PRIVATE -lrenderdoc_libentry)
 endif()
 
-add_library(renderdoc SHARED ${renderdoc_objects})
+if(NOT VITA)
+    add_library(renderdoc SHARED ${renderdoc_objects})
+else()
+    add_executable(renderdoc ${renderdoc_objects})
+endif()
 target_compile_definitions(renderdoc ${RDOC_DEFINITIONS})
 target_include_directories(renderdoc ${RDOC_INCLUDES})
 target_link_libraries(renderdoc ${RDOC_LIBRARIES})
@@ -553,6 +590,36 @@ if(APPLE)
     set_target_properties(renderdoc PROPERTIES INSTALL_NAME_DIR "@executable_path/../lib")
     set_target_properties(renderdoc PROPERTIES BUILD_WITH_INSTALL_RPATH 1)
     set_target_properties(renderdoc PROPERTIES BUILD_WITH_INSTALL_NAME_DIR 1)
+endif()
+
+if(VITA)
+    #set_target_properties(renderdoc PROPERTIES LINK_FLAGS "-nostdlib")
+    message(STATUS "renderdoc Flags: ${CMAKE_CXX_FLAGS}")
+
+    set(TITLE_ID "RENDERDOC")
+    set(TITLE_NAME "Renderdoc 1.7")
+
+    #vita_create_self(renderdoc.suprx "${PROJECT_BINARY_DIR}/bin/renderdoc" CONFIG renderdoc.yml)
+    add_custom_target(renderdoc.velf ALL
+        COMMAND vita-elf-create "${PROJECT_BINARY_DIR}/bin/renderdoc" renderdoc.velf
+        DEPENDS renderdoc
+    )
+
+    add_custom_target(eboot.bin ALL
+        COMMAND vita-make-fself renderdoc.velf eboot.bin
+        DEPENDS renderdoc.velf
+    )
+
+    add_custom_target(renderdoc.vpk ALL
+        COMMAND vita-mksfoex -s TITLE_ID=${TITLE_ID} "${TITLE_NAME}" param.sfo
+        COMMAND vita-pack-vpk -s param.sfo -b eboot.bin renderdoc.vpk
+        DEPENDS eboot.bin
+    )
+
+    add_custom_target(send
+	    COMMAND curl -T eboot.bin ftp://192.168.178.49:1337/ux0:/app/${TITLE_ID}/
+	    DEPENDS eboot.bin
+    )
 endif()
 
 if(ANDROID)

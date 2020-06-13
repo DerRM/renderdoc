@@ -88,6 +88,8 @@ rdcstr OSUtility::MakeMachineIdentString(uint64_t ident)
     ret += "Android ";
   else if(ident & MachineIdent_iOS)
     ret += "iOS ";
+  else if(ident & MachineIdent_PSVita)
+    ret += "PS Vita ";
 
   if(ident & MachineIdent_Arch_x86)
     ret += "x86 ";

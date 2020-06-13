@@ -43,5 +43,7 @@ renderdocui/3rdparty/ironpython/pythonlibs.zip
 qrenderdoc/generated/
 qrenderdoc/3rdparty/pyside
 .DS_Store
+.vscode/
+CmakeFiles/
 plugins-*/
 __pycache__

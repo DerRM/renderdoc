@@ -378,7 +378,7 @@ uint32_t PipeState::MultiviewBroadcastCount() const
 {
   if(IsCaptureLoaded() && IsCaptureVK())
   {
-    return std::max((uint32_t)m_Vulkan->currentPass.renderpass.multiviews.size(), 1U);
+    return std::max((uint32_t)m_Vulkan->currentPass.renderpass.multiviews.size(), UINT32_C(1));
   }
 
   return 1;

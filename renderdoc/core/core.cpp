@@ -411,6 +411,8 @@ void RenderDoc::Initialise()
       "macOS";
 #elif ENABLED(RDOC_GGP)
       "GGP";
+#elif ENABLED(RDOC_VITA)
+      "PS Vita";
 #else
       "Unknown";
 #endif

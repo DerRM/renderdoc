@@ -976,9 +976,9 @@ void RenderDoc::BecomeRemoteServer(const char *listenhost, uint16_t port,
         "narrow "
         "this down or accept connections from more ranges.");
 
-    listenRanges.push_back(make_rdcpair(Network::MakeIP(10, 0, 0, 0), 0xff000000));
-    listenRanges.push_back(make_rdcpair(Network::MakeIP(172, 16, 0, 0), 0xfff00000));
-    listenRanges.push_back(make_rdcpair(Network::MakeIP(192, 168, 0, 0), 0xffff0000));
+    listenRanges.push_back(make_rdcpair(Network::MakeIP(UINT32_C(10), UINT32_C(0), UINT32_C(0), UINT32_C(0)), UINT32_C(0xff000000)));
+    listenRanges.push_back(make_rdcpair(Network::MakeIP(UINT32_C(172), UINT32_C(16), UINT32_C(0), UINT32_C(0)), UINT32_C(0xfff00000)));
+    listenRanges.push_back(make_rdcpair(Network::MakeIP(UINT32_C(192), UINT32_C(168), UINT32_C(0), UINT32_C(0)), UINT32_C(0xffff0000)));
   }
 
   RDCLOG("Allowing connections from:");

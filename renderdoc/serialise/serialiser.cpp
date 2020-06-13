@@ -119,6 +119,7 @@ uint32_t Serialiser<SerialiserMode::Reading>::BeginChunk(uint32_t, uint64_t)
 
     // Chunk index 0 is not allowed in normal situations, and allows us to indicate some control
     // bytes. Currently this is unused
+    RDCDEBUG("c: %d, success: %s", c, success ? "true" : "false");
     RDCASSERT(c != 0 || !success);
 
     chunkID = c & ChunkIndexMask;
@@ -916,6 +917,14 @@ rdcstr DoStringise(const uint32_t &el)
   return StringFormat::Fmt("%u", el);
 }
 
+#if __UINT32_MAX__ == 0xffffffffUL
+template <>
+rdcstr DoStringise(const unsigned int &el)
+{
+  return StringFormat::Fmt("%u", el);
+}
+#endif
+
 template <>
 rdcstr DoStringise(const char &el)
 {
@@ -945,6 +954,14 @@ rdcstr DoStringise(const int32_t &el)
 {
   return StringFormat::Fmt("%d", el);
 }
+
+#if __INT32_MAX__ == 0x7fffffffL
+template <>
+rdcstr DoStringise(const int &el)
+{
+  return StringFormat::Fmt("%d", el);
+}
+#endif
 
 template <>
 rdcstr DoStringise(const int16_t &el)

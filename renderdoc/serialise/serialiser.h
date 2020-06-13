@@ -1224,7 +1224,7 @@ public:
       SDObject &current = *m_StructureStack.back();
 
       current.type.basetype = type;
-      current.type.byteSize = RDCMAX(len, 0);
+      current.type.byteSize = RDCMAX(len, INT32_C(0));
       current.data.str = el ? el : "";
       if(len == -1)
         current.type.flags |= SDTypeFlags::NullString;
@@ -1402,6 +1402,14 @@ BASIC_TYPE_SERIALISE(int16_t, el, SDBasic::SignedInteger, 2);
 BASIC_TYPE_SERIALISE(uint16_t, el, SDBasic::UnsignedInteger, 2);
 BASIC_TYPE_SERIALISE(int8_t, el, SDBasic::SignedInteger, 1);
 BASIC_TYPE_SERIALISE(uint8_t, el, SDBasic::UnsignedInteger, 1);
+
+#if __UINT32_MAX__ == 0xffffffffUL
+BASIC_TYPE_SERIALISE(unsigned int, el, SDBasic::UnsignedInteger, 4);
+#endif
+#if __INT32_MAX__ == 0x7fffffffL
+BASIC_TYPE_SERIALISE(int, el, SDBasic::SignedInteger, 4);
+#endif
+
 
 BASIC_TYPE_SERIALISE(double, el, SDBasic::Float, 8);
 BASIC_TYPE_SERIALISE(float, el, SDBasic::Float, 4);

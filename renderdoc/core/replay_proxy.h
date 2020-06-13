@@ -288,7 +288,7 @@ public:
          (m_APIProps.localRenderer == GraphicsAPI::OpenGL))
       {
         TextureDescription tex = m_Proxy->GetTexture(texture);
-        uint32_t mipHeight = RDCMAX(1U, tex.height >> sub.mip);
+        uint32_t mipHeight = RDCMAX(UINT32_C(1), tex.height >> sub.mip);
         y = (mipHeight - 1) - y;
       }
 

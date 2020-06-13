@@ -431,7 +431,7 @@ static void StandardFillCBufferVariables(ResourceId shader, const rdcarray<Shade
 
     uint8_t rows = invars[v].type.descriptor.rows;
     uint8_t cols = invars[v].type.descriptor.columns;
-    uint32_t elems = RDCMAX(1U, invars[v].type.descriptor.elements);
+    uint32_t elems = RDCMAX(UINT32_C(1), invars[v].type.descriptor.elements);
     const bool rowMajor = invars[v].type.descriptor.rowMajorStorage != 0;
     const bool isArray = elems > 1;
 
@@ -909,7 +909,7 @@ bool HighlightCache::FetchHighlightPositions(const MeshDisplay &cfg, FloatVector
     // in only one primitive, so we pick the first primitive
     // it's in. This means the first N points are in the first
     // primitive, and thereafter each point is in the next primitive
-    uint32_t v = RDCMAX(idx, 1U) - 1;
+    uint32_t v = RDCMAX(idx, UINT32_C(1)) - 1;
 
     // skip past any primitive restart indices
     if(idxData && primRestart)
@@ -927,7 +927,7 @@ bool HighlightCache::FetchHighlightPositions(const MeshDisplay &cfg, FloatVector
     // in only one primitive, so we pick the first primitive
     // it's in. This means the first N points are in the first
     // primitive, and thereafter each point is in the next primitive
-    uint32_t v = RDCMAX(idx, 2U) - 1;
+    uint32_t v = RDCMAX(idx, UINT32_C(2)) - 1;
 
     // first vert in the whole fan
     activePrim.push_back(InterpretVertex(data, 0, cfg, dataEnd, true, valid));
@@ -940,7 +940,7 @@ bool HighlightCache::FetchHighlightPositions(const MeshDisplay &cfg, FloatVector
     // in only one primitive, so we pick the first primitive
     // it's in. This means the first N points are in the first
     // primitive, and thereafter each point is in the next primitive
-    uint32_t v = RDCMAX(idx, 2U) - 2;
+    uint32_t v = RDCMAX(idx, UINT32_C(2)) - 2;
 
     // skip past any primitive restart indices
     if(idxData && primRestart)
@@ -960,7 +960,7 @@ bool HighlightCache::FetchHighlightPositions(const MeshDisplay &cfg, FloatVector
     // in only one primitive, so we pick the first primitive
     // it's in. This means the first N points are in the first
     // primitive, and thereafter each point is in the next primitive
-    uint32_t v = RDCMAX(idx, 3U) - 3;
+    uint32_t v = RDCMAX(idx, UINT32_C(3)) - 3;
 
     // skip past any primitive restart indices
     if(idxData && primRestart)
@@ -1014,7 +1014,7 @@ bool HighlightCache::FetchHighlightPositions(const MeshDisplay &cfg, FloatVector
 
           // min() with number of indices in case this is a tiny strip
           // that is basically just a list
-          InterpretVertex(data, RDCMIN(6U, numidx - 1), cfg, dataEnd, true, valid),
+          InterpretVertex(data, RDCMIN(UINT32_C(6), numidx - 1), cfg, dataEnd, true, valid),
       };
 
       // these are the triangles on the far left of the MSDN diagram above
@@ -1079,7 +1079,7 @@ bool HighlightCache::FetchHighlightPositions(const MeshDisplay &cfg, FloatVector
       // we're in the middle somewhere. Each primitive has two vertices for it
       // so our step rate is 2. The first 'middle' primitive starts at indices 5&6
       // and uses indices all the way back to 0
-      uint32_t v = RDCMAX(((idx + 1) / 2) * 2, 6U) - 6;
+      uint32_t v = RDCMAX(((idx + 1) / 2) * 2, UINT32_C(6)) - 6;
 
       // skip past any primitive restart indices
       if(idxData && primRestart)

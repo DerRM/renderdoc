@@ -356,6 +356,50 @@ bool Socket::RecvDataBlocking(void *buf, uint32_t length)
   return true;
 }
 
+bool Socket::RecvFrom(void *data, uint32_t &length, rdcstr &fromAddr)
+{
+  if(length == 0)
+    return true;
+
+  struct sockaddr_in senderaddr;
+  int senderaddr_size = sizeof(senderaddr);
+
+   // socket is already blocking, don't have to change anything
+  int ret = recvfrom(socket, (char *)data, length, 0, (SOCKADDR*) &senderaddr, &senderaddr_size);
+
+  if(ret > 0)
+  {
+    length = (uint32_t)ret;
+
+    CHAR bytes[INET_ADDRSTRLEN] = {0};
+    inet_ntop(AF_INET, &senderaddr.sin_addr, (PSTR)&bytes[0], INET_ADDRSTRLEN);
+    fromAddr = rdcstr((const char* const)&bytes[0]);
+  }
+  else
+  {
+    length = 0;
+    int err = WSAGetLastError();
+
+    if(err == WSAEWOULDBLOCK)
+    {
+      return true;
+    }
+    else
+    {
+      RDCWARN("recv: %s", wsaerr_string(err).c_str());
+      Shutdown();
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool Socket::SendTo()
+{
+  return false;
+}
+
 Socket *CreateServerSocket(const char *bindaddr, uint16_t port, int queuesize)
 {
   SOCKET s = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
@@ -491,6 +535,59 @@ Socket *CreateClientSocket(const char *host, uint16_t port, int timeoutMS)
   return NULL;
 }
 
+Socket *CreateUDPSocket(const char *bindaddr, uint16_t port)
+{
+    sockaddr_in addr;
+    RDCEraseEl(addr);
+
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(port);
+
+    SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+
+    if(s == INVALID_SOCKET)
+    {
+        return NULL;
+    }
+
+    uint32_t yes = 1;
+    int res = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char *)&yes, sizeof(yes));
+    if (res < 0)
+    {
+      RDCDEBUG("error");
+    }
+
+    int sizeofAddr = sizeof(addr);
+
+    int result = bind(s, (SOCKADDR*)&addr, sizeofAddr);
+    if(result == SOCKET_ERROR)
+    {
+        int err = WSAGetLastError();
+
+        if(err != 0)
+        {
+            RDCDEBUG("%s", wsaerr_string(err).c_str());
+            closesocket(s);
+        }
+    }
+    else
+    {
+        struct ip_mreq mreq;
+        RDCEraseEl(mreq);
+        inet_pton(AF_INET, bindaddr, &mreq.imr_multiaddr.s_addr);
+        mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+        if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0)
+        {
+          RDCDEBUG("error");
+        }
+        return new Socket((ptrdiff_t)s);
+    }
+
+    RDCDEBUG("Failed to connect to %s:%d", addr, port);
+    return NULL;
+}
+
 bool ParseIPRangeCIDR(const char *str, uint32_t &ip, uint32_t &mask)
 {
   uint32_t a = 0, b = 0, c = 0, d = 0, num = 0;
@@ -518,4 +615,4 @@ bool ParseIPRangeCIDR(const char *str, uint32_t &ip, uint32_t &mask)
 
   return true;
 }
-};
+};    // namespace Network

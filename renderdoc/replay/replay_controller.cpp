@@ -574,7 +574,7 @@ bool ReplayController::SaveTexture(const TextureSave &saveData, const char *path
   else
   {
     if(sd.sample.sampleIndex != ~0U)
-      sd.sample.sampleIndex = RDCCLAMP((uint32_t)sd.sample.sampleIndex, 0U, td.msSamp);
+      sd.sample.sampleIndex = RDCCLAMP((uint32_t)sd.sample.sampleIndex, UINT32_C(0), td.msSamp);
   }
 
   // don't support cube cruciform for non cubemaps, or
@@ -583,9 +583,9 @@ bool ReplayController::SaveTexture(const TextureSave &saveData, const char *path
     sd.slice.cubeCruciform = false;
 
   if(sd.mip != -1)
-    sd.mip = RDCCLAMP(sd.mip, 0, (int32_t)td.mips);
+    sd.mip = RDCCLAMP(sd.mip, INT32_C(0), (int32_t)td.mips);
   if(sd.slice.sliceIndex != -1)
-    sd.slice.sliceIndex = RDCCLAMP(sd.slice.sliceIndex, 0, int32_t(td.arraysize * td.depth));
+    sd.slice.sliceIndex = RDCCLAMP(sd.slice.sliceIndex, INT32_C(0), int32_t(td.arraysize * td.depth));
 
   if(td.arraysize * td.depth * td.msSamp == 1)
   {
@@ -597,7 +597,7 @@ bool ReplayController::SaveTexture(const TextureSave &saveData, const char *path
   if(sd.channelExtract >= 0 && (uint32_t)sd.channelExtract >= td.format.compCount)
     sd.channelExtract = -1;
 
-  sd.slice.sliceGridWidth = RDCMAX(sd.slice.sliceGridWidth, 1);
+  sd.slice.sliceGridWidth = RDCMAX(sd.slice.sliceGridWidth, INT32_C(1));
 
   // store sample count so we know how many 'slices' is one real slice
   // multisampled textures cannot have mips, subresource layout is same as would be for mips:
@@ -687,7 +687,7 @@ bool ReplayController::SaveTexture(const TextureSave &saveData, const char *path
         // in the first real slice
         sliceOffset = sd.sample.sampleIndex;
         sliceStride = sampleCount;
-        numSlices = RDCMAX(1U, td.arraysize / sampleCount);
+        numSlices = RDCMAX(UINT32_C(1), td.arraysize / sampleCount);
       }
       else
       {
@@ -790,9 +790,9 @@ bool ReplayController::SaveTexture(const TextureSave &saveData, const char *path
   int blockSize = 0;
   uint32_t bytesPerPixel = 1;
 
-  td.width = RDCMAX(1U, td.width >> mipOffset);
-  td.height = RDCMAX(1U, td.height >> mipOffset);
-  td.depth = RDCMAX(1U, td.depth >> mipOffset);
+  td.width = RDCMAX(UINT32_C(1), td.width >> mipOffset);
+  td.height = RDCMAX(UINT32_C(1), td.height >> mipOffset);
+  td.depth = RDCMAX(UINT32_C(1), td.depth >> mipOffset);
 
   if(td.format.type == ResourceFormatType::BC1 || td.format.type == ResourceFormatType::BC2 ||
      td.format.type == ResourceFormatType::BC3 || td.format.type == ResourceFormatType::BC4 ||
@@ -803,8 +803,8 @@ bool ReplayController::SaveTexture(const TextureSave &saveData, const char *path
         (td.format.type == ResourceFormatType::BC1 || td.format.type == ResourceFormatType::BC4)
             ? 8
             : 16;
-    rowPitch = RDCMAX(1U, ((td.width + 3) / 4)) * blockSize;
-    slicePitch = rowPitch * RDCMAX(1U, td.height / 4);
+    rowPitch = RDCMAX(UINT32_C(1), ((td.width + 3) / 4)) * blockSize;
+    slicePitch = rowPitch * RDCMAX(UINT32_C(1), td.height / 4);
     blockformat = true;
   }
   else
@@ -878,13 +878,13 @@ bool ReplayController::SaveTexture(const TextureSave &saveData, const char *path
 
       uint32_t mipSlicePitch = slicePitch;
 
-      uint32_t w = RDCMAX(1U, td.width >> m);
-      uint32_t h = RDCMAX(1U, td.height >> m);
-      uint32_t d = RDCMAX(1U, td.depth >> m);
+      uint32_t w = RDCMAX(UINT32_C(1), td.width >> m);
+      uint32_t h = RDCMAX(UINT32_C(1), td.height >> m);
+      uint32_t d = RDCMAX(UINT32_C(1), td.depth >> m);
 
       if(blockformat)
       {
-        mipSlicePitch = RDCMAX(1U, ((w + 3) / 4)) * blockSize * RDCMAX(1U, h / 4);
+        mipSlicePitch = RDCMAX(UINT32_C(1), ((w + 3) / 4)) * blockSize * RDCMAX(UINT32_C(1), h / 4);
       }
       else
       {
@@ -1477,14 +1477,14 @@ rdcarray<PixelModification> ReplayController::PixelHistory(ResourceId target, ui
 
       if(m_Textures[t].dimension == 3)
       {
-        subresource.slice = RDCCLAMP(subresource.slice, 0U, m_Textures[t].depth >> subresource.mip);
+        subresource.slice = RDCCLAMP(subresource.slice, UINT32_C(0), m_Textures[t].depth >> subresource.mip);
       }
       else
       {
-        subresource.slice = RDCCLAMP(subresource.slice, 0U, m_Textures[t].arraysize);
+        subresource.slice = RDCCLAMP(subresource.slice, UINT32_C(0), m_Textures[t].arraysize);
       }
 
-      subresource.mip = RDCCLAMP(subresource.mip, 0U, m_Textures[t].mips - 1);
+      subresource.mip = RDCCLAMP(subresource.mip, UINT32_C(0), m_Textures[t].mips - 1);
 
       break;
     }

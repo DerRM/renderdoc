@@ -2332,7 +2332,7 @@ void ReplayProxy::EnsureTexCached(ResourceId &texid, CompType typeCast, const Su
       RemapProxyTextureIfNeeded(tex, proxy.params);
 
       proxy.id = m_Proxy->CreateProxyTexture(tex);
-      proxy.msSamp = RDCMAX(1U, tex.msSamp);
+      proxy.msSamp = RDCMAX(UINT32_C(1), tex.msSamp);
       proxyit = m_ProxyTextures.insert(std::make_pair(texid, proxy)).first;
     }
 

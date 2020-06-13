@@ -116,6 +116,12 @@ misrepresented as being the original software.
  #define TINYFD_NOCCSUNICODE
  #define SLASH "\\"
  int tinyfd_winUtf8 = 0 ; /* on windows string char can be 0:MBCS or 1:UTF-8 */
+#elif defined(__vita__)
+ #include <limits.h>
+ #include <unistd.h>
+ #include <dirent.h> /* on old systems try <sys/dir.h> instead */
+ #include <signal.h> /* on old systems try <sys/signal.h> instead */
+ #define SLASH "/"
 #else
  #include <limits.h>
  #include <unistd.h>
@@ -3170,6 +3176,7 @@ char const * tinyfd_colorChooser(
         return p ;
 }
 
+#elif defined(__vita__)
 
 #else /* unix */
 

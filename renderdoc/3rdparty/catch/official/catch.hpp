@@ -155,7 +155,7 @@ namespace Catch {
 
 ////////////////////////////////////////////////////////////////////////////////
 // We know some environments not to support full POSIX signals
-#if defined(__CYGWIN__) || defined(__QNX__) || defined(__EMSCRIPTEN__) || defined(__DJGPP__)
+#if defined(__CYGWIN__) || defined(__QNX__) || defined(__EMSCRIPTEN__) || defined(__DJGPP__) || defined(__vita__)
     #define CATCH_INTERNAL_CONFIG_NO_POSIX_SIGNALS
 #endif
 

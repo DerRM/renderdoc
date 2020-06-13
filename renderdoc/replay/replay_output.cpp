@@ -424,7 +424,7 @@ rdcpair<uint32_t, uint32_t> ReplayOutput::PickVertex(uint32_t x, uint32_t y)
     if(m_RenderData.meshDisplay.showAllInstances)
     {
       firstInst = 0;
-      maxInst = RDCMAX(1U, draw->numInstances);
+      maxInst = RDCMAX(UINT32_C(1), draw->numInstances);
     }
 
     // used for post-VS output, calculate the offset of the element we're using as position,
@@ -443,7 +443,7 @@ rdcpair<uint32_t, uint32_t> ReplayOutput::PickVertex(uint32_t x, uint32_t y)
         cfg.position.vertexByteOffset = fmt.vertexByteOffset + elemOffset;
 
       uint32_t vert = m_pDevice->PickVertex(m_EventID, m_Width, m_Height, cfg, x, y);
-      if(vert != ~0U)
+      if(vert != ~UINT32_C(0))
       {
         return make_rdcpair(vert, inst);
       }
@@ -823,7 +823,7 @@ void ReplayOutput::DisplayMesh()
 
       if(d)
       {
-        for(uint32_t inst = 0; inst < RDCMAX(1U, d->numInstances); inst++)
+        for(uint32_t inst = 0; inst < RDCMAX(UINT32_C(1), d->numInstances); inst++)
         {
           // get the 'most final' stage
           MeshFormat fmt = m_pDevice->GetPostVSBuffers(
@@ -846,9 +846,9 @@ void ReplayOutput::DisplayMesh()
     {
       uint32_t maxInst = 0;
       if(m_RenderData.meshDisplay.showPrevInstances)
-        maxInst = RDCMAX(1U, m_RenderData.meshDisplay.curInstance);
+        maxInst = RDCMAX(UINT32_C(1), m_RenderData.meshDisplay.curInstance);
       if(m_RenderData.meshDisplay.showAllInstances)
-        maxInst = RDCMAX(1U, draw->numInstances);
+        maxInst = RDCMAX(UINT32_C(1), draw->numInstances);
 
       for(uint32_t inst = 0; inst < maxInst; inst++)
       {

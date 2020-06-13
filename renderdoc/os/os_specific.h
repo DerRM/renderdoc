@@ -185,6 +185,9 @@ public:
   bool RecvDataBlocking(void *data, uint32_t length);
   bool RecvDataNonBlocking(void *data, uint32_t &length);
 
+  bool RecvFrom(void *data, uint32_t &length, rdcstr &fromAddr);
+  bool SendTo();
+
 private:
   ptrdiff_t socket;
   uint32_t timeoutMS;
@@ -192,6 +195,7 @@ private:
 
 Socket *CreateServerSocket(const char *addr, uint16_t port, int queuesize);
 Socket *CreateClientSocket(const char *host, uint16_t port, int timeoutMS);
+Socket *CreateUDPSocket(const char *addr, uint16_t port);
 
 // ip is packed in HOST byte order
 inline uint32_t GetIPOctet(uint32_t ip, uint32_t octet)
@@ -467,6 +471,7 @@ enum MachineIdentBits
   MachineIdent_macOS = 0x00000004,
   MachineIdent_Android = 0x00000008,
   MachineIdent_iOS = 0x00000010,
+  MachineIdent_PSVita = 0x00000020,
   // unused bits 0x20, 0x40, 0x80
   MachineIdent_OS_Mask = 0x000000ff,
 
@@ -514,6 +519,8 @@ inline uint64_t CountLeadingZeroes(uint64_t value);
 #include "win32/win32_specific.h"
 #elif ENABLED(RDOC_POSIX)
 #include "posix/posix_specific.h"
+#elif ENABLED(RDOC_VITA)
+#include "vita/vita_specific.h"
 #else
 #error Undefined Platform!
 #endif

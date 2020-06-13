@@ -766,7 +766,7 @@ bool write_dds_to_file(FILE *f, const dds_data &data)
         (data.format.type == ResourceFormatType::BC1 || data.format.type == ResourceFormatType::BC4)
             ? 8
             : 16;
-    header.dwPitchOrLinearSize = RDCMAX(1U, ((header.dwWidth + 3) / 4)) * blockSize;
+    header.dwPitchOrLinearSize = RDCMAX(UINT32_C(1), ((header.dwWidth + 3) / 4)) * blockSize;
   }
   else
   {
@@ -877,7 +877,7 @@ bool write_dds_to_file(FILE *f, const dds_data &data)
 
           int rowlen = RDCMAX(1, data.width >> mip);
           int numRows = RDCMAX(1, data.height >> mip);
-          int pitch = RDCMAX(1U, rowlen * bytesPerPixel);
+          int pitch = RDCMAX(UINT32_C(1), rowlen * bytesPerPixel);
 
           // pitch/rows are in blocks, not pixels, for block formats.
           if(blockFormat)
@@ -942,11 +942,11 @@ dds_data load_dds_from_file(FILE *f)
     dx10Header = true;
   }
 
-  ret.width = RDCMAX(1U, header.dwWidth);
-  ret.height = RDCMAX(1U, header.dwHeight);
-  ret.depth = RDCMAX(1U, header.dwDepth);
-  ret.slices = dx10Header ? RDCMAX(1U, headerDXT10.arraySize) : 1;
-  ret.mips = RDCMAX(1U, header.dwMipMapCount);
+  ret.width = RDCMAX(UINT32_C(1), header.dwWidth);
+  ret.height = RDCMAX(UINT32_C(1), header.dwHeight);
+  ret.depth = RDCMAX(UINT32_C(1), header.dwDepth);
+  ret.slices = dx10Header ? RDCMAX(UINT32_C(1), headerDXT10.arraySize) : 1;
+  ret.mips = RDCMAX(UINT32_C(1), header.dwMipMapCount);
 
   uint32_t cubeFlags = DDSCAPS2_CUBEMAP | DDSCAPS2_CUBEMAP_ALLFACES;
 
@@ -1106,7 +1106,7 @@ dds_data load_dds_from_file(FILE *f)
       rowlen = AlignUp(rowlen, subsamplePacking);
       int numRows = RDCMAX(1, ret.height >> mip);
       int numdepths = RDCMAX(1, ret.depth >> mip);
-      int pitch = RDCMAX(1U, rowlen * bytesPerPixel);
+      int pitch = RDCMAX(UINT32_C(1), rowlen * bytesPerPixel);
 
       // pitch/rows are in blocks, not pixels, for block formats.
       if(blockFormat)
