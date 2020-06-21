@@ -247,8 +247,8 @@ CREATE_PATCHED_CALL(SceBool, sceGxmDepthStencilSurfaceIsEnabled, const SceGxmDep
 
 CREATE_PATCHED_CALL(void, sceGxmDepthStencilSurfaceSetBackgroundDepth, SceGxmDepthStencilSurface *surface, float backgroundDepth)
 {
-    //LOG("sceGxmDepthStencilSurfaceSetBackgroundDepth(surface: %p, backgroundDepth: %f)\n", surface, backgroundDepth);
-    return TAI_CONTINUE(void, sceGxmDepthStencilSurfaceSetBackgroundDepthRef, surface, backgroundDepth);
+    LOG("sceGxmDepthStencilSurfaceSetBackgroundDepth(surface: %p, backgroundDepth: %f)\n", surface, backgroundDepth);
+    return TAI_NEXT(sceGxmDepthStencilSurfaceSetBackgroundDepth, sceGxmDepthStencilSurfaceSetBackgroundDepthRef, surface, backgroundDepth);
 }
 
 CREATE_PATCHED_CALL(void, sceGxmDepthStencilSurfaceSetBackgroundMask, SceGxmDepthStencilSurface *surface, SceBool backgroundMask)
@@ -1091,10 +1091,10 @@ CREATE_PATCHED_CALL(int, sceGxmSetVertexUniformBuffer, SceGxmContext *context, u
     return TAI_CONTINUE(int, sceGxmSetVertexUniformBufferRef, context, bufferIndex, bufferData);
 }
 
-CREATE_PATCHED_CALL(void, sceGxmSetViewport, SceGxmContext *context, unsigned int xOffset, unsigned int xScale, unsigned int yOffset, unsigned int yScale, unsigned int zOffset, unsigned int zScale)
+CREATE_PATCHED_CALL(void, sceGxmSetViewport, SceGxmContext *context, float xOffset, float xScale, float yOffset, float yScale, float zOffset, float zScale)
 {
-    //LOG("sceGxmSetViewport(context: %p, xOffset: %f, xScale: %f, yOffset: %f, yScale: %f, zOffset: %f, zScale: %f)\n", context, xOffset, xScale, yOffset, yScale, zOffset, zScale);
-    return TAI_CONTINUE(void, sceGxmSetViewportRef, context, xOffset, xScale, yOffset, yScale, zOffset, zScale);
+    LOG("sceGxmSetViewport(context: %p, xOffset: %f, xScale: %f, yOffset: %f, yScale: %f, zOffset: %f, zScale: %f)\n", context, xOffset, xScale, yOffset, yScale, zOffset, zScale);
+    TAI_NEXT(sceGxmSetViewport, sceGxmSetViewportRef, context, xOffset, xScale, yOffset, yScale, zOffset, zScale);
 }
 
 CREATE_PATCHED_CALL(void, sceGxmSetViewportEnable, SceGxmContext *context, SceGxmViewportMode enable)
@@ -1123,8 +1123,8 @@ CREATE_PATCHED_CALL(void, sceGxmSetWClampEnable, SceGxmContext *context, SceGxmW
 
 CREATE_PATCHED_CALL(void, sceGxmSetWClampValue, SceGxmContext *context, float clampValue)
 {
-    //LOG("sceGxmSetWClampValue(context: %p, clampValue: %f)\n", context, clampValue);
-    TAI_CONTINUE(void, sceGxmSetWClampValueRef, context, clampValue);
+    LOG("sceGxmSetWClampValue(context: %p, clampValue: %f)\n", context, clampValue);
+    TAI_NEXT(sceGxmSetWClampValue, sceGxmSetWClampValueRef, context, clampValue);
 }
 
 CREATE_PATCHED_CALL(int, sceGxmSetWarningEnabled, SceGxmWarning warning, SceBool enable)
