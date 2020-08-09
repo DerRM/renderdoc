@@ -186,6 +186,7 @@ enum class RDCDriver : uint32_t
   Vulkan = 8,
   OpenGLES = 9,
   D3D8 = 10,
+  GXM = 11,
   MaxBuiltin,
   Custom = 100000,
   Custom0 = Custom,

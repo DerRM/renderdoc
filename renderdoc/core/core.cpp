@@ -156,6 +156,7 @@ rdcstr DoStringise(const RDCDriver &el)
     STRINGISE_ENUM_CLASS(D3D8);
     STRINGISE_ENUM_CLASS(Image);
     STRINGISE_ENUM_CLASS(Vulkan);
+    STRINGISE_ENUM_CLASS(GXM);
   }
   END_ENUM_STRINGISE();
 }
