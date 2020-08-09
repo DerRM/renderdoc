@@ -171,9 +171,7 @@ static void WriteListDir(int* socket, uint32_t bytesWritten)
 }
 
 static SceUID threadId;
-static SceUID serverThreadId;
 static SceUID multicastThreadId;
-static SceUID clientControlThreadId;
 static int running = 0;
 
 static void RespondToClient(int* socket, enum RemoteServerPacket type)
@@ -182,7 +180,7 @@ static void RespondToClient(int* socket, enum RemoteServerPacket type)
     {
     case eRemoteServer_Handshake:
     {
-        LOG("Respond to Handshake\n");
+        //LOG("Respond to Handshake\n");
 
         uint32_t handshake = eRemoteServer_Handshake;
         WriteUint32(socket, handshake);
@@ -232,56 +230,23 @@ static void RespondToClient(int* socket, enum RemoteServerPacket type)
     }
 }
 
-static void RespondToClientControl(int* socket, enum PacketType type)
-{
-    switch (type)
-    {
-    case ePacket_Handshake:
-    {
-        LOG("Respond to Handshake\n");
-
-        uint32_t handshake = eRemoteServer_Handshake;
-        WriteUint32(socket, handshake);
-
-        uint32_t chunkSize = 0;
-        WriteUint32(socket, chunkSize);
-
-        uint32_t version = 6;
-        WriteUint32(socket, version);
-
-        uint32_t len = 6;
-        uint8_t ps_str[] = "PSVita";
-        WriteString(socket, ps_str, len);
-        
-        SceUID pid = sceKernelGetProcessId();
-
-        WriteUint32(socket, (uint32_t)pid);
-
-        uint8_t alignment[38] = {};
-        Write(socket, alignment, 38);
-    } break;
-    default:
-        break;
-    }
-}
-
 static void ReceiveFromClient(int* socket, enum RemoteServerPacket type)
 {
     switch (type)
     {
     case eRemoteServer_Handshake:
     {
-        LOG("Received Handshake\n");
+        //LOG("Received Handshake\n");
         
         uint32_t chunkSize = 0;
         ReadUint32(socket, &chunkSize);
 
-        LOG("Received chunkSize: %" PRIu32 "\n", chunkSize);
+        //LOG("Received chunkSize: %" PRIu32 "\n", chunkSize);
 
         uint32_t version;
         ReadUint32(socket, &version);
 
-        LOG("Received version: %" PRIu32 "\n", version);
+        //LOG("Received version: %" PRIu32 "\n", version);
 
         uint8_t padding[52];
 
@@ -345,36 +310,6 @@ static void ReceiveFromClient(int* socket, enum RemoteServerPacket type)
     RespondToClient(socket, type);
 }
 
-static void ReceiveFromClientControl(int* socket, enum PacketType type)
-{
-    switch (type)
-    {
-    case ePacket_Handshake:
-    {
-        LOG("Received Handshake\n");
-        
-        uint32_t chunkSize = 0;
-        ReadUint32(socket, &chunkSize);
-
-        LOG("Received chunkSize: %" PRIu32 "\n", chunkSize);
-
-        uint32_t version;
-        ReadUint32(socket, &version);
-
-        LOG("Received version: %" PRIu32 "\n", version);
-
-        uint8_t padding[52];
-
-        Read(socket, padding, 52);
-    } break;
-    default:
-        LOG("Received unknown Client Control Packet: %" PRIu32 "\n", (uint32_t)type);
-        break;
-    }
-
-    RespondToClientControl(socket, type);
-}
-
 struct Client
 {
     int client_socket;
@@ -412,157 +347,6 @@ static int sClientThreadInit(SceSize args, void *init)
     return 0;
 }
 
-static int sClientControlThreadInit(SceSize args, void *init)
-{
-    if (args < 1)
-    {
-        return 0;
-    }
-
-    struct Client* client_sock = (struct Client*)init;
-    int client = client_sock->client_socket;
-
-    if (client != -1) {
-        uint32_t type = 0;
-        ReadUint32(&client, &type);
-
-        if (type == 0)
-        {
-            if (client != -1){
-                uint8_t bytes[64];
-                RecvDataNonBlocking(&client, bytes, 64);
-                sceKernelDelayThread(5 * 1000);
-            }
-            return 0;
-        }
-
-        ReceiveFromClientControl(&client, (enum RemoteServerPacket)type);
-        sceKernelDelayThread(5 * 1000);
-    }
-
-    while(client != -1)
-    {
-        uint32_t type = (uint32_t)ePacket_Noop;
-        WriteUint32(&client, type);
-
-        /*if (type == 0)
-        {
-            if (client != -1){
-                uint8_t bytes[64];
-                RecvDataNonBlocking(&client, bytes, 64);
-                sceKernelDelayThread(5 * 1000);
-            }
-            continue;
-        }
-
-        ReceiveFromClientControl(&client, (enum PacketType)type);*/
-        sceKernelDelayThread(500 * 1000);
-    }
-
-    return 0;
-}
-
-static int sClientControlStartThreadInit(SceSize args, void *init) {
-
-    LOG("Remote Server started\n");
-    uint32_t port = 31245;
-    int socket = CreateSocket("0.0.0.0", port & 0xffff, 4);
-
-    while (socket < 0 && port <= 31250) 
-    {
-        ++port;
-        socket = CreateSocket("0.0.0.0", port & 0xffff, 4);
-    }
-
-    if (socket >= 0) 
-    {
-        LOG("Client control with port: %" PRIu32 "\n", port);
-        running = 1;
-    }
-
-    while(running) {
-
-        int client = AcceptClient(&socket, 0);
-
-        if (client < 0) 
-        {
-            if (!(socket >= 0))
-            {
-                LOG("Error in accept - shutting down server\n");
-                sceNetSocketClose(socket);
-                return 0;
-            }
-            sceKernelDelayThread(5 * 1000);
-            continue;
-        }
-        else {
-            LOG("accepted connection to client for remote server\n");
-        }
-
-        struct Client client_sock = {};
-        client_sock.client_socket = client;
-
-        SceUID clientThreadId = createThread("RemoteServerClientControlThread", &sClientControlThreadInit, sizeof(client_sock), &client_sock);
-
-        int threadStatus;
-        SceUInt timeout = (SceUInt)-1;
-        sceKernelWaitThreadEnd(clientThreadId, &threadStatus, &timeout);
-
-        sceKernelDeleteThread(clientThreadId);
-    }
-
-    return 0;
-}
-
-static int sRemoteControlThreadInit(SceSize args, void *init)
-{
-
-    LOG("Remote Server started\n");
-    uint32_t port = RENDERDOC_FIRST_TARGET_CONTROL_PORT;
-    int socket = CreateSocket("0.0.0.0", port & 0xffff, 4);
-
-    while (socket < 0 && port <= RENDERDOC_LAST_TARGET_CONTROL_PORT) 
-    {
-        ++port;
-        socket = CreateSocket("0.0.0.0", port & 0xffff, 4);
-    }
-
-    if (socket >= 0) 
-    {
-        LOG("Server with port: %" PRIu32 "\n", port);
-        running = 1;
-    }
-
-    while(running)
-    {
-        int client = AcceptClient(&socket, 0);
-
-        if (client < 0) 
-        {
-            if (!(socket >= 0))
-            {
-                LOG("Error in accept - shutting down server\n");
-                sceNetSocketClose(socket);
-                return 0;
-            }
-            sceKernelDelayThread(5 * 1000);
-            continue;
-        }
-        else {
-            LOG("accepted connection to client for remote server\n");
-        }
-
-
-        if (client != -1)
-        {
-            Shutdown(&client);
-            LOG("Shutdown connection to client\n");
-        }
-    }
-
-    return 0;
-}
-
 static int sThreadInit(SceSize args, void *init)
 {
     uint32_t port = RENDERDOC_SERVER_PORT;
@@ -594,7 +378,7 @@ static int sThreadInit(SceSize args, void *init)
             continue;
         }
         else {
-            LOG("accepted connection to client\n");
+            //LOG("accepted connection to client\n");
         }
 
         struct Client client_sock = {};
@@ -649,9 +433,7 @@ int module_start(SceSize args, void *argp) {
     LOG("vitahook\n");
 
     threadId = createThread("RemoteServerThread", &sThreadInit, 0, NULL);
-    serverThreadId = createThread("TargetControlServerThread", &sRemoteControlThreadInit, 0, NULL);
     multicastThreadId = createThread("MulticastThread", &sMulticastInit, 0, NULL);
-    clientControlThreadId = createThread("TargetClientControlThread", &sClientControlStartThreadInit, 0, NULL);
 
     hook = taiHookFunctionImport(&ref, 
                                 TAI_MAIN_MODULE,

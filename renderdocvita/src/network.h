@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <inttypes.h>
+#include <stdbool.h>
 
 extern uint32_t timeoutMS;
 
@@ -14,5 +15,6 @@ int RecvDataNonBlocking(int* socket, void *buf, uint32_t length);
 int CreateMulticastSocket(uint32_t bindaddr, uint16_t port);
 int CreateLoopbackSocket(uint16_t port, int listen);
 void Shutdown(int* socket);
+bool IsRecvDataWaiting(int* socket);
 
 #endif

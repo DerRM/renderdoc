@@ -188,6 +188,35 @@ int SendDataBlocking(int* socket, const void *buf, uint32_t length)
   return 1;
 }
 
+bool IsRecvDataWaiting(int* socket)
+{
+  char dummy;
+  int ret = sceNetRecv(*socket, &dummy, 1, SCE_NET_MSG_PEEK);
+
+  if (ret == 0)
+  {
+    Shutdown(socket);
+    return false;
+  }
+  else if (ret <= 0)
+  {
+    if ((unsigned int)(ret) == SCE_NET_ERROR_EINTR 
+        || (unsigned int)(ret) == SCE_NET_ERROR_EWOULDBLOCK
+        || (unsigned int)(ret) == SCE_NET_ERROR_EAGAIN)
+    {
+      ret = 0;
+    }
+    else
+    {
+      LOG("recv: %s\n", sce_net_error_string(ret));
+      Shutdown(socket);
+      return false;
+    }
+  }
+
+  return ret > 0;
+}
+
 int RecvDataBlocking(int* socket, void *buf, uint32_t length)
 {
   uint32_t timeoutMS = 5000 * 1000;

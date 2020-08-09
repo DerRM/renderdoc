@@ -20,6 +20,11 @@ int WriteUint64(int* socket, uint64_t val)
     return Write(socket, &val, sizeof(uint64_t));
 }
 
+int WriteFloat(int* socket, float val)
+{
+    return Write(socket, &val, sizeof(float));
+}
+
 int WriteString(int* socket, uint8_t *str, uint32_t length)
 {
     if (Write(socket, &length, 4)) {
@@ -30,9 +35,9 @@ int WriteString(int* socket, uint8_t *str, uint32_t length)
     }
 }
 
-int WriteBool(int* socket, uint8_t bool)
+int WriteBool(int* socket, uint8_t val)
 {
-    return Write(socket, &bool, 1);
+    return Write(socket, &val, 1);
 }
 
 #define BUFFER_SIZE 64 * 1024
@@ -62,7 +67,7 @@ int ReadString(int* socket, uint8_t *str, uint32_t *length)
     }
 }
 
-int ReadBool(int* socket, uint8_t *bool)
+int ReadBool(int* socket, uint8_t *val)
 {
-    return Read(socket, bool, 1);
+    return Read(socket, val, 1);
 }

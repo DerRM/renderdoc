@@ -241,8 +241,9 @@ ExecuteResult VitaRemoteServer::ExecuteAndInject(const char *a, const char *w, c
     SERIALISE_ELEMENT(executable);
   }
 
+  Threading::Sleep(5 * 1000);
   ret.status = ReplayStatus::Succeeded;
-  ret.ident = 0;
+  ret.ident = 38920;
 
   return ret;
 }
