@@ -9,5 +9,6 @@ extern char current_titleid[32];
 SceUID vitaHookStartApp(char* titleId, uint32_t flags, char* path, uint32_t unk);
 void vitaHookInstallHooks(SceUID pid);
 void vitaHookSetCurrentTitle(char* titleId, uint32_t size);
+void vitaHookSaveFile(const char* path, uint8_t* data, uint32_t size);
 
 #endif

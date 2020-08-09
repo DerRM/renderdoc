@@ -13,3 +13,4 @@ vita_hook_kernel:
         - vitaHookStartApp
         - vitaHookInstallHooks
         - vitaHookSetCurrentTitle
+        - vitaHookSaveFile

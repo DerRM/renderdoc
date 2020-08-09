@@ -83,32 +83,11 @@ SceUID vitaHookStartApp(char* titleId, uint32_t flags, char* path, uint32_t unk)
     int ret = module_get_export_func(KERNEL_PID, "SceProcessmgr", 0xEB1F8EF7, 0x68068618, (uintptr_t*)&sceKernelLaunchApp);
     ksceDebugPrintf("ret: %" PRIi32 "\n", ret);
 
-    //ret = module_get_export_func(KERNEL_PID, "SceProcessmgr", 0xEB1F8EF7, 0x68068618, (uintptr_t*)&sceKernelResumeProcess);
-    //ksceDebugPrintf("ret: %" PRIi32 "\n", ret);
-    
-    SceUID pid = 0;
-
-    uint8_t bytes[64] = {
-        0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1d, 0x00, 
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-        0x00, 0x00, 0x00, 0x00, 0xb1, 0x14, 0x01, 0x00, 
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-        0xa0, 0x31, 0x5a, 0x02, 0x40, 0x00, 0x00, 0x00, 
-        0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 
-    };
-
-    //uint8_t kernel_bytes[64];
-    //res = ksceKernelStrncpyUserToKernel(kernel_bytes, (uintptr_t)(bytes), 64);
-
     SceAppMgrLaunchParam param = {};
     param.size = sizeof(SceAppMgrLaunchParam);
 
-    pid = ksceAppMgrLaunchAppByPath(execPath, NULL, 0, 0, &param, NULL);
-    //ksceKernelResumeProcess(pid);
-    //pid = sceKernelLaunchApp(titId, flags, execPath, bytes);
-    
+    SceUID pid = ksceAppMgrLaunchAppByPath(execPath, NULL, 0, 0, &param, NULL);
+
     int status = 0;
     ksceKernelGetProcessStatus(pid, &status);
     ksceDebugPrintf("process status %" PRIi32 "\n", status);
@@ -117,4 +96,65 @@ SceUID vitaHookStartApp(char* titleId, uint32_t flags, char* path, uint32_t unk)
 
     EXIT_SYSCALL(state);
     return pid;
+}
+
+void vitaHookSaveFile(const char* path, uint8_t* data, uint32_t size)
+{
+    const size_t pathLength = 128;
+    char kpath[pathLength];
+    const size_t bufferLength = 2 * 1024;
+    char kdata[bufferLength];
+
+    int state = 0;
+    ENTER_SYSCALL(state);
+
+    int res = ksceKernelStrncpyUserToKernel(kpath, (uintptr_t)(path), pathLength);
+    if (res < 0)
+    {
+        EXIT_SYSCALL(state);
+        return;
+    }
+
+    SceUID fd = ksceIoOpen(kpath, SCE_O_WRONLY | SCE_O_CREAT, 0777);
+    if (fd < 0) 
+    {
+        ksceDebugPrintf("Could not open file: %s to write: reason %" PRIi32 "\n", kpath, fd);
+        EXIT_SYSCALL(state);
+        return;
+    }
+
+    uint8_t* ptr = data;
+
+    for (uint32_t lsize = 0; lsize < size; lsize += bufferLength) {
+
+        uint32_t copysize = bufferLength;
+
+        if ((lsize + bufferLength) > size) {
+            copysize = size - lsize;
+        }
+
+        //ksceDebugPrintf("Copy data: lsize %" PRIu32 ", ptr: %p, copysize: %" PRIu32 "\n", lsize, ptr, copysize);
+
+        res = ksceKernelMemcpyUserToKernel(kdata, (uintptr_t)(ptr), copysize);
+        if (res < 0)
+        {
+            ksceIoClose(fd);
+            EXIT_SYSCALL(state);
+            return;
+        }
+
+        res = ksceIoWrite(fd, kdata, copysize);
+        if (res < 0)
+        {
+            ksceIoClose(fd);
+            EXIT_SYSCALL(state);
+            return;
+        }
+        
+        ptr += bufferLength;
+    }
+
+    ksceIoClose(fd);
+
+    EXIT_SYSCALL(state);
 }
