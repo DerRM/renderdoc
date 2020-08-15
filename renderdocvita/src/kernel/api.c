@@ -4,7 +4,6 @@
 #include <inttypes.h>
 
 #include <vitasdkkern.h>
-#include <psp2/gxm.h>
 #include <taihen.h>
 
 #define APP_DIR "ux0:app"
@@ -27,13 +26,13 @@ static SceUID launchApp(void* args)
 }
 */
 
-static SceUID hook;
-static tai_hook_ref_t ref;
+//static SceUID hook;
+//static tai_hook_ref_t ref;
 
-int sceGxmDraw_hooked(SceGxmContext* context, SceGxmPrimitiveType primType, SceGxmIndexFormat indexType, const void* indexData, unsigned int indexCount) {
-    ksceDebugPrintf("hello from sceGxmDraw(context: %p, primType: %d, indexType: %d, indexData: %p, indexCount: %d) ;)\n", context, primType, indexType, indexData, indexCount);
-    return TAI_CONTINUE(int, ref, context, primType, indexType, indexData, indexCount);
-}
+//int sceGxmDraw_hooked(SceGxmContext* context, SceGxmPrimitiveType primType, SceGxmIndexFormat indexType, const void* indexData, unsigned int indexCount) {
+//    ksceDebugPrintf("hello from sceGxmDraw(context: %p, primType: %d, indexType: %d, indexData: %p, indexCount: %d) ;)\n", context, primType, indexType, indexData, indexCount);
+//    return TAI_CONTINUE(int, ref, context, primType, indexType, indexData, indexCount);
+//}
 
 void vitaHookSetCurrentTitle(char* titleId, uint32_t size)
 {
@@ -49,7 +48,7 @@ void vitaHookSetCurrentTitle(char* titleId, uint32_t size)
 
     EXIT_SYSCALL(state);
 }
-
+/*
 void vitaHookInstallHooks(SceUID pid)
 {
     hook = taiHookFunctionImportForKernel(pid, &ref, "SceGxm", 0x0D0AA0CB, 0xBC059AFC, &sceGxmDraw_hooked);
@@ -57,7 +56,7 @@ void vitaHookInstallHooks(SceUID pid)
     {
         ksceDebugPrintf("hook of sceGxmDraw failed with: %" PRIi32 "\n", hook);
     }
-}
+}*/
 
 SceUID vitaHookStartApp(char* titleId, uint32_t flags, char* path, uint32_t unk){
 

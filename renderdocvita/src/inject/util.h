@@ -5,5 +5,6 @@
 
 char const* sysmodule2str(SceUInt16 id);
 char const* taihenerr2str(SceUID res);
+char const* sysmodres2str(int res);
 
 #endif

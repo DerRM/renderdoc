@@ -1,5 +1,6 @@
 #include <vitasdk.h>
 #include <taihen.h>
+#include <kuio.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +16,7 @@ int g_capture = 0;
 int g_log = 0;
 int g_log_display = 0;
 
-void* g_framebuffers[16] = {};
+void* g_framebuffers[64] = {};
 uint32_t g_framebufferCount = 0;
 
 void* g_baseFrame;
@@ -36,6 +37,59 @@ if (g_log) \
 #else
 #define LOGD(...)
 #endif
+
+typedef struct sce_module_exports {
+  uint16_t size;           // size of this structure; 0x20 for Vita 1.x
+  uint8_t  lib_version[2]; //
+  uint16_t attribute;      // ?
+  uint16_t num_functions;  // number of exported functions
+  uint16_t num_vars;       // number of exported variables
+  uint16_t unk;
+  uint32_t num_tls_vars;   // number of exported TLS variables?  <-- pretty sure wrong // yifanlu
+  uint32_t lib_nid;        // NID of this specific export list; one PRX can export several names
+  char     *lib_name;      // name of the export module
+  uint32_t *nid_table;     // array of 32-bit NIDs for the exports, first functions then vars
+  void     **entry_table;  // array of pointers to exported functions and then variables
+} sce_module_exports_t;
+
+struct sce_module_imports_1 {
+  uint16_t size;               // size of this structure; 0x34
+  uint16_t version;            //
+  uint16_t flags;              //
+  uint16_t num_functions;      // number of imported functions
+  uint16_t num_vars;           // number of imported variables
+  uint16_t num_tls_vars;       // number of imported TLS variables
+  uint32_t reserved1;          // ?
+  uint32_t lib_nid;            // NID of the module to link to
+  char     *lib_name;          // name of module
+  uint32_t reserved2;          // ?
+  uint32_t *func_nid_table;    // array of function NIDs (numFuncs)
+  void     **func_entry_table; // parallel array of pointers to stubs; they're patched by the loader to jump to the final code
+  uint32_t *var_nid_table;     // NIDs of the imported variables (numVars)
+  void     **var_entry_table;  // array of pointers to "ref tables" for each variable
+  uint32_t *tls_nid_table;     // NIDs of the imported TLS variables (numTlsVars)
+  void     **tls_entry_table;  // array of pointers to ???
+};
+
+struct sce_module_imports_2 {
+  uint16_t size; // 0x24
+  uint16_t version;
+  uint16_t flags;
+  uint16_t num_functions;
+  uint32_t reserved1;
+  uint32_t lib_nid;
+  char     *lib_name;
+  uint32_t *func_nid_table;
+  void     **func_entry_table;
+  uint32_t unk1;
+  uint32_t unk2;
+};
+
+typedef union sce_module_imports {
+  uint16_t size;
+  struct sce_module_imports_1 type1;
+  struct sce_module_imports_2 type2;
+} sce_module_imports_t;
 
 typedef struct SceGxmCommandList {
     uint32_t data[8];
@@ -63,37 +117,9 @@ typedef enum SceGxmWarning {
 } SceGxmWarning;
 
 typedef void (*disp_callback_t)(const void* test);
-
 static disp_callback_t g_displaycallback;
-
 void display_queue_callback_patched(const void* callbackdata) {
-    //sceClibPrintf("my own display queue callback\n");
-
-    if (g_log_display && g_logFrameCount == g_displayWaitCount) {
-        //for (uint32_t index = 0; index < g_framebufferCount; ++index) {
-            if (g_framebufferCount /*&& g_baseFrame == g_framebuffers[index]*/) {
-                //uint32_t fb_index = (index + g_framebufferCount - 1) % g_framebufferCount;
-                sceClibPrintf("capture from %p\n", g_framebuffers[0]);
-                /*SceUID fd;
-                if((fd = sceIoOpen("ux0:/tai/test.bin", SCE_O_WRONLY, 0755)) < 0) {
-                    sceClibPrintf("error when writing file: %" PRIi32 "\n", fd);
-                    g_log_display = 0;
-                    ++g_displayWaitCount;
-                    return;
-                }
-                sceIoWrite(fd, g_framebuffers[fb_index], 4 * 1024 * 544);
-                sceIoClose(fd);*/
-                vitaHookSaveFile("ux0:/tai/test.bin", g_framebuffers[0], 4 * 1024 * 544);
-               // break;
-            }
-        //}
-
-        g_log_display = 0;
-    }
-
     if (g_displaycallback) g_displaycallback(callbackdata);
-
-    ++g_displayWaitCount;
 }
 
 #define CREATE_PATCHED_CALL(return_type, name, ...)  \
@@ -101,16 +127,64 @@ static tai_hook_ref_t name##Ref;                     \
 static SceUID name##Hook;                            \
 static return_type name##Patched(__VA_ARGS__)
 
+#define CHUNK_SIZE 2048 // Screenshot buffer size in bytes
+static uint8_t sshot_buffer[CHUNK_SIZE];
+
 static tai_hook_ref_t sceDisplaySetFrameBufRef;
 static SceUID sceDisplaySetFrameBufHook;
 static int sceDisplaySetFrameBufPatched(SceDisplayFrameBuf* frameBuf, SceDisplaySetBufSync bufSync) {
 
-    int ret = TAI_CONTINUE(int, sceDisplaySetFrameBufRef, frameBuf, bufSync);
+    if (g_log_display) {
+        // Opening screenshot output file
+		SceDateTime time;
+		sceRtcGetCurrentClockLocalTime(&time);
+        char fname[256];
+		sceClibSnprintf(fname, 256, "ux0:/data/renderdoc/%s-%d-%d-%d-%d-%d-%d.bmp", "renderdoc", time.year, time.month, time.day, time.hour, time.minute, time.second);
+		SceUID fd;
+		kuIoOpen(fname, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, &fd);
+		
+		// Writing Bitmap Header
+		memset(sshot_buffer, 0, 0x36);
+		*((uint16_t*)(&sshot_buffer[0x00])) = 0x4D42;
+		*((uint32_t*)(&sshot_buffer[0x02])) = ((frameBuf->width * frameBuf->height)<<2) + 0x36;
+		*((uint32_t*)(&sshot_buffer[0x0A])) = 0x36;
+		*((uint32_t*)(&sshot_buffer[0x0E])) = 0x28;
+		*((uint32_t*)(&sshot_buffer[0x12])) = frameBuf->width;
+		*((uint32_t*)(&sshot_buffer[0x16])) = frameBuf->height;
+		*((uint32_t*)(&sshot_buffer[0x1A])) = 0x00200001;
+		*((uint32_t*)(&sshot_buffer[0x22])) = ((frameBuf->width * frameBuf->height) << 2);
+		kuIoWrite(fd, sshot_buffer, 0x36);
+		
+		// Writing Bitmap Table
+		int x, y, i;
+		i = 0;
+		uint32_t* buffer = (uint32_t*)sshot_buffer;
+		uint32_t* framedata = (uint32_t*)frameBuf->base;
+		for (y = 1; y <= frameBuf->height; y++){
+			for (x = 0; x < frameBuf->width; x++){
+				buffer[i] = framedata[x + (frameBuf->height - y) * frameBuf->pitch];
+				uint8_t* clr = (uint8_t*)&buffer[i];
+				uint8_t r = clr[0];
+				uint8_t g = clr[1];
+				uint8_t b = clr[2];
+				uint8_t a = clr[3];
+				buffer[i] = (a << 24) | (r << 16) | (g << 8) | b;
+				i++;
+				if (i == (CHUNK_SIZE >> 2)){
+					i = 0;
+					kuIoWrite(fd, sshot_buffer, CHUNK_SIZE);
+				}
+			}
+		}
+		if (i != 0) kuIoWrite(fd, sshot_buffer, i << 2);
+		
+		// Saving file
+		kuIoClose(fd);
 
-    //LOGD("sceDisplaySetFrameBuf() called\n");
-    g_baseFrame = frameBuf->base;
+        g_log_display = 0;
+    }
 
-    return ret;
+    return TAI_CONTINUE(int, sceDisplaySetFrameBufRef, frameBuf, bufSync);
 }
 
 static tai_hook_ref_t sceDisplayWaitVblankStartRef;
@@ -132,15 +206,13 @@ static tai_hook_ref_t sceNetInitRef;
 static SceUID sceNetInitHook;
 static int sceNetInitPatched(SceNetInitParam* param) {
 
-    int ret = TAI_CONTINUE(int, sceNetInitRef, param);
+    int ret = 0;//TAI_CONTINUE(int, sceNetInitRef, param);
     LOG("sceNetInit(param: %p) called\n", param);
-
-    if (ret >= 0) {
-        serverThreadId = createThread("TargetControlServerThread", &sRemoteControlThreadInit, 0, NULL);
-    }
-    
+   
     return ret;
 }
+
+static uint8_t networkbuffer[16 * 1024];
 
 static tai_hook_ref_t sceSysmoduleLoadModuleRef;
 static SceUID sceSysmoduleLoadModuleHook;
@@ -151,8 +223,62 @@ static int sceSysmoduleLoadModulePatched(SceUInt16 id) {
     LOG("sceSysmoduleLoadModule(id: %s) called with ret: %" PRIi32 "\n", sysmodule2str(id), ret);
 
     if (ret >= 0 && SCE_SYSMODULE_NET == id) {
+
         sceNetInitHook = taiHookFunctionImport(&sceNetInitRef, TAI_MAIN_MODULE, 0x6BF8B2A2, 0xEB03E265, sceNetInitPatched);
-        if (sceNetInitHook < 0) LOG("Could not hook sceNetInit, reason: %s\n", taihenerr2str(sceNetInitHook)); else LOG("hooked sceNetInit\n");
+        if (sceNetInitHook < 0) {
+            LOG("Could not hook sceNetInit, reason: %s\n", taihenerr2str(sceNetInitHook)); 
+        }
+        else {
+            LOG("hooked sceNetInit\n");
+        }
+/*
+        SceUID modlist[256];
+        int numMods = 256;
+        int res = sceKernelGetModuleList(0x7FFFFFFF, modlist, &numMods);
+        if (res < 0) LOG("Could not get module list\n"); 
+        else {
+            LOG("Got module list with %" PRIi32 " modules\n", numMods);
+            for (int index = 0; index < numMods; ++index) {
+                SceKernelModuleInfo modInfo = {};
+                res = sceKernelGetModuleInfo(modlist[index], &modInfo);
+                if (res >= 0) {
+                    LOG("modid: %" PRIi32", mod name: %s, mod version: %" PRIu8 ".%" PRIu8 "\n", modlist[index], modInfo.module_name, ((uint8_t*)(&modInfo.flags))[3], ((uint8_t*)(&modInfo.flags))[2]);
+                    
+                    tai_module_info_t taiModInfo = {};
+                    taiModInfo.size = sizeof(tai_module_info_t);
+                    res = taiGetModuleInfo(modInfo.module_name, &taiModInfo);
+                    if (res < 0) LOG("Could not get module info, reason: %s\n", taihenerr2str(res)); else LOG("got module info\n");
+
+                    for (uintptr_t cur = taiModInfo.imports_start; cur < taiModInfo.imports_end; ) {
+                        sce_module_imports_t *import = (sce_module_imports_t*)cur;
+                        if (import->size == sizeof(struct sce_module_imports_1)) {
+                            LOG("import Lib: %s, Lib Nid: 0x%08X\n", import->type1.lib_name, import->type1.lib_nid);
+                            for (uint16_t i = 0; i < import->type1.num_functions; ++i) {
+                                LOG("\timport Func Nid: 0x%08X\n", import->type1.func_nid_table[i]);
+                            }
+                        }
+                        else if (import->size == sizeof(struct sce_module_imports_2)) {
+                            LOG("import Lib: %s, Lib Nid: 0x%08X\n", import->type2.lib_name, import->type2.lib_nid);
+                            for (uint16_t i = 0; i < import->type2.num_functions; ++i) {
+                                LOG("\timport Func Nid: 0x%08X\n", import->type2.func_nid_table[i]);
+                            }
+                        }
+                        cur += import->size;
+                    }
+
+                    for (uintptr_t cur = taiModInfo.exports_start; cur < taiModInfo.exports_start; ) {
+                        sce_module_exports_t *export = (sce_module_exports_t*)cur;
+                        LOG("export Lib: %s, Lib Nid: 0x%08X\n", export->lib_name, export->lib_nid);
+                        for (uint16_t i = 0; i < export->num_functions; ++i) {
+                            LOG("\texport Func Nid: 0x%08X\n", export->nid_table[i]);
+                        }
+                        
+                        cur += export->size;
+                    }
+                }
+            }
+        }
+                    */
     }
 
     return ret;
@@ -166,9 +292,9 @@ static int sceSysmoduleUnloadModulePatched(SceUInt16 id) {
 
     LOG("sceSysmoduleUnloadModule(id: %s) called with ret: %" PRIi32 "\n", sysmodule2str(id), ret);
 
-    if (ret >= 0 && SCE_SYSMODULE_NET == id) {
-        taiHookRelease(sceNetInitHook, sceNetInitRef);
-    }
+   // if (ret >= 0 && SCE_SYSMODULE_NET == id) {
+    //    taiHookRelease(sceNetInitHook, sceNetInitRef);
+    //}
 
     return ret;
 }
@@ -274,7 +400,7 @@ CREATE_PATCHED_CALL(SceGxmColorSurfaceType, sceGxmColorSurfaceGetType, const Sce
 
 CREATE_PATCHED_CALL(int, sceGxmColorSurfaceInit, SceGxmColorSurface *surface, SceGxmColorFormat colorFormat, SceGxmColorSurfaceType surfaceType, SceGxmColorSurfaceScaleMode scaleMode, SceGxmOutputRegisterSize outputRegisterSize, unsigned int width, unsigned int height, unsigned int strideInPixels, void *data)
 {
-    if (colorFormat == 0 && width == 960 && height == 544 && g_framebufferCount < 3) 
+    if (colorFormat == 0 && width == 960 && height == 544) 
     {
         LOG("sceGxmColorSurfaceInit(surface: %p, colorFormat: %" PRIu32 ", surfaceType: %" PRIu32 ", scaleMode: %" PRIu32", outputRegisterSize: %" PRIu32 ", width: %" PRIu32 ", height: %" PRIu32 ", strideInPixels: %" PRIu32 ", data: %p)\n", surface, colorFormat, surfaceType, scaleMode, outputRegisterSize, width, height, strideInPixels, data);
         g_framebuffers[g_framebufferCount++] = data;
@@ -606,6 +732,31 @@ CREATE_PATCHED_CALL(int, sceGxmGetRenderTargetMemSizes, const SceGxmRenderTarget
 
 CREATE_PATCHED_CALL(int, sceGxmInitialize, SceGxmInitializeParams *params)
 {
+    int ret = sceNetShowNetstat();
+    if (ret == SCE_NET_ERROR_ENOTINIT) {
+        LOG("Net not initialized so far\n");
+
+        if (sceSysmoduleIsLoaded(SCE_SYSMODULE_NET) != SCE_SYSMODULE_LOADED)
+            sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
+        SceNetInitParam initparam;
+        initparam.memory = networkbuffer;
+        initparam.size = 16*1024;
+        initparam.flags = 0;
+        ret = sceNetInit(&initparam);
+        if (ret < 0) {
+            LOG("sceNetInit failed: %08X\n", ret);
+        }
+
+        serverThreadId = createThread("TargetControlServerThread", &sRemoteControlThreadInit, 0, NULL);
+    }
+    else if (ret < 0) {
+        LOG("Net error\n");
+    }
+    else {
+        LOG("Net seems to be initialized\n");
+        serverThreadId = createThread("TargetControlServerThread", &sRemoteControlThreadInit, 0, NULL);
+    }
+
     LOG("sceGxmInitialize(params: %p)\n", params);
     LOG("sceGxmInitialize(params.displayQueueCallback: %p)\n", params->displayQueueCallback);
     LOG("sceGxmInitialize(params.displayQueueCallbackDataSize: %" PRIu32 ")\n", params->displayQueueCallbackDataSize);
@@ -2088,8 +2239,6 @@ static int sClientControlThreadInit(SceSize args, void *init)
     return 0;
 }
 
-static uint8_t networkbuffer[1024 * 1024];
-
 static int sRemoteControlThreadInit(SceSize args, void *init)
 {
     LOG("Remote Server started\n");
@@ -2432,20 +2581,10 @@ int module_start(SceSize args, void *argp) {
     sceDisplaySetFrameBufHook = taiHookFunctionImport(&sceDisplaySetFrameBufRef, TAI_MAIN_MODULE, 0x4FAACD11, 0x7A410B64, sceDisplaySetFrameBufPatched);
     if (sceDisplaySetFrameBufHook < 0) LOG("Could not hook sceDisplaySetFrameBuf\n"); else LOG("hooked sceDisplaySetFrameBuf\n");
 
+    kuIoMkdir("ux0:/data/renderdoc");
 
     //sceDisplayWaitVblankStartHook = taiHookFunctionImport(&sceDisplayWaitVblankStartRef, TAI_MAIN_MODULE, 0x5ED8F994, 0x05F27764, sceDisplayWaitVblankStartPatched);
     //if (sceDisplayWaitVblankStartHook < 0) LOG("Could not hook sceDisplayWaitVblankStart\n"); else LOG("hooked sceDisplayWaitVblankStart\n");
-
-    /*SceNetInitParam netParams = {};
-    int size = 1 * 1024 * 1024;
-    netParams.size = size;
-    netParams.memory = &networkbuffer[0];
-    netParams.flags = 0;
-
-    if (sceNetInit(&netParams) < 0)
-    {
-        LOG("Could not initilialize network\n");
-    }*/
 
    // serverThreadId = createThread("TargetControlServerThread", &sRemoteControlThreadInit, 0, NULL);
     //clientControlThreadId = createThread("TargetClientControlThread", &sClientControlStartThreadInit, 0, NULL);

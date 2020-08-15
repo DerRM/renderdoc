@@ -126,3 +126,14 @@ char const* sysmodule2str(SceUInt16 id) {
     default: return "<invalid module>";
     }
 }
+
+char const* sysmodres2str(int res) {
+	switch (res)
+	{
+	CASE2STR(SCE_SYSMODULE_LOADED);
+	CASE2STR(SCE_SYSMODULE_ERROR_INVALID_VALUE);
+	CASE2STR(SCE_SYSMODULE_ERROR_UNLOADED);
+	CASE2STR(SCE_SYSMODULE_ERROR_FATAL);
+	default: return "<invalid res>";
+	}
+}

@@ -11,6 +11,5 @@ vita_hook_kernel:
       syscall: true
       functions:
         - vitaHookStartApp
-        - vitaHookInstallHooks
         - vitaHookSetCurrentTitle
         - vitaHookSaveFile
