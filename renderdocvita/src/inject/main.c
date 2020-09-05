@@ -12,10 +12,56 @@
 #include "../serializer.h"
 #include "../kernel/api.h"
 
+
+struct FileHeader {
+    uint64_t magic;
+    uint32_t version;
+    uint32_t headerLength;
+    char progVersion[16];
+};
+
+struct BinaryThumbnail
+{
+  uint16_t width;
+  uint16_t height;
+  uint32_t length;
+  uint8_t data[1];
+};
+
+struct CaptureMetaData
+{
+  uint64_t machineIdent;
+  uint32_t driverID;
+  uint8_t driverNameLength;
+  char driverName[1];
+} captureMetaData = 
+{
+    0,
+    0,
+    1,
+    {0}
+};
+
+struct BinarySectionHeader
+{
+  uint8_t isASCII;
+  uint8_t zero[3];
+  uint32_t sectionType;
+  uint64_t sectionCompressedLength;
+  uint64_t sectionUncompressedLength;
+  uint64_t sectionVersion;
+  uint32_t sectionFlags;
+  uint32_t sectionNameLength;
+  char name[1];
+};
+
+static char g_titleid[16];
 int g_capture = 0;
 int g_log = 0;
 int g_log_display = 0;
+SceUID g_fd = -1;
 
+uint64_t g_fileoffset = 0;
 void* g_framebuffers[64] = {};
 uint32_t g_framebufferCount = 0;
 
@@ -582,6 +628,8 @@ CREATE_PATCHED_CALL(int, sceGxmDestroyRenderTarget, SceGxmRenderTarget *renderTa
     return TAI_CONTINUE(int, sceGxmDestroyRenderTargetRef, renderTarget);
 }
 
+char fname[256];
+
 CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer, SceGxmSyncObject *newBuffer, const void *callbackData)
 {
     int ret = TAI_CONTINUE(int, sceGxmDisplayQueueAddEntryRef, oldBuffer, newBuffer, callbackData);
@@ -591,12 +639,62 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
         g_log = 0;
         g_log_display = 1;
         g_logFrameCount = g_frameCount;
+
+        kuIoLseek(g_fd, sizeof(struct FileHeader) + offsetof(struct BinaryThumbnail, data) + offsetof(struct CaptureMetaData, driverName) + 4 + offsetof(struct BinarySectionHeader, sectionCompressedLength), SCE_SEEK_SET);
+
+        kuIoWrite(g_fd, &g_fileoffset, sizeof(uint64_t));
+        kuIoWrite(g_fd, &g_fileoffset, sizeof(uint64_t));
+        kuIoClose(g_fd);
+        g_fileoffset = 0;
+        g_fd = -1;
     }
 
     if (g_capture) {
         g_capture = 0;
 
         g_log = 1;
+
+        SceDateTime time;
+		sceRtcGetCurrentClockLocalTime(&time);
+		sceClibSnprintf(fname, 256, "ux0:/data/renderdoc/%s_%04d.%02d.%02d_%02d.%02d.rdc", g_titleid, time.year, time.month, time.day, time.hour, time.minute);
+
+        kuIoOpen(fname, SCE_O_WRONLY | SCE_O_CREAT, &g_fd);
+
+        struct FileHeader header = {};
+        header.magic = 1129268306U;
+        header.version = 257U;
+        memset(header.progVersion, 0, 16);
+        memcpy(header.progVersion, "1.7 09dce6", 10);
+
+        struct BinaryThumbnail thumbHeader = {};
+        thumbHeader.width = 0;
+        thumbHeader.height = 0;
+        thumbHeader.length = 0;
+
+        struct CaptureMetaData meta;
+        meta.driverID = 11;
+        meta.machineIdent = 0;
+        meta.driverNameLength = 4;
+
+        header.headerLength = sizeof(struct FileHeader) + offsetof(struct BinaryThumbnail, data) + thumbHeader.length +
+                              offsetof(struct CaptureMetaData, driverName) + meta.driverNameLength;
+        kuIoWrite(g_fd, &header, sizeof(struct FileHeader));
+        kuIoWrite(g_fd, &thumbHeader, offsetof(struct BinaryThumbnail, data));
+        kuIoWrite(g_fd, &meta, offsetof(struct CaptureMetaData, driverName));
+        kuIoWrite(g_fd, "GXM", meta.driverNameLength);
+
+        struct BinarySectionHeader section;
+        section.isASCII = '\0';
+        memset(section.zero, 0, 3);
+        section.sectionType = 1U;
+        section.sectionCompressedLength = 0;
+        section.sectionUncompressedLength = 0;
+        section.sectionVersion = 0;
+        section.sectionFlags = 0;
+        section.sectionNameLength = 13;
+
+        kuIoWrite(g_fd, &section, offsetof(struct BinarySectionHeader, name));
+        kuIoWrite(g_fd, "FrameCapture", section.sectionNameLength);
     }
 
     ++g_frameCount;
@@ -612,7 +710,19 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueFinish)
 
 CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType primType, SceGxmIndexFormat indexType, const void* indexData, unsigned int indexCount)
 {
-    LOGD("sceGxmDraw(context: %p, primType: %" PRIu32 ", indexType: %" PRIu32 ", indexData: %p, indexCount: %" PRIu32 ")\n", context, primType, indexType, indexData, indexCount);
+    if (g_log) {
+        uint32_t buffer[64];
+        memset(&buffer[0], 0, 64);
+        uint32_t type = 1048U;
+        kuIoWrite(g_fd, &type, sizeof(uint32_t));
+        kuIoWrite(g_fd, &buffer[0], 4);
+        kuIoWrite(g_fd, &primType, sizeof(SceGxmPrimitiveType));
+        kuIoWrite(g_fd, &indexType, sizeof(SceGxmIndexFormat));
+        kuIoWrite(g_fd, &indexCount, sizeof(uint32_t));
+        g_fileoffset += 20;
+        LOG("sceGxmDraw(context: %p, primType: %" PRIu32 ", indexType: %" PRIu32 ", indexData: %p, indexCount: %" PRIu32 ")\n", context, primType, indexType, indexData, indexCount);
+    }
+
     return TAI_CONTINUE(int, sceGxmDrawRef, context, primType, indexType, indexData, indexCount);
 }
 
@@ -2580,6 +2690,8 @@ int module_start(SceSize args, void *argp) {
 
     sceDisplaySetFrameBufHook = taiHookFunctionImport(&sceDisplaySetFrameBufRef, TAI_MAIN_MODULE, 0x4FAACD11, 0x7A410B64, sceDisplaySetFrameBufPatched);
     if (sceDisplaySetFrameBufHook < 0) LOG("Could not hook sceDisplaySetFrameBuf\n"); else LOG("hooked sceDisplaySetFrameBuf\n");
+
+	sceAppMgrAppParamGetString(0, 12, g_titleid , 256);
 
     kuIoMkdir("ux0:/data/renderdoc");
 

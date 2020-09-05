@@ -13,6 +13,12 @@
     <Filter Include="Function Wrappers">
       <UniqueIdentifier>{b7b3ff97-0177-459b-a8b8-29a371b42d68}</UniqueIdentifier>
     </Filter>
+    <Filter Include="PCH">
+      <UniqueIdentifier>{4e9ed5f9-73dc-4408-86bd-f1458af676c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="NewFilter1">
+      <UniqueIdentifier>{e3eec8c6-f1f7-4aef-9d28-cd83b678afa9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="gxm_driver.h">
@@ -29,6 +35,9 @@
     <ClInclude Include="gxm_resources.h">
       <Filter>Util</Filter>
     </ClInclude>
+    <ClInclude Include="precompiled.h">
+      <Filter>PCH</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gxm_driver.cpp">
@@ -38,6 +47,15 @@
       <Filter>Replay</Filter>
     </ClCompile>
     <ClCompile Include="wrappers\gxm_buffer_funcs.cpp">
+      <Filter>Function Wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="precompiled.cpp">
+      <Filter>PCH</Filter>
+    </ClCompile>
+    <ClCompile Include="wrappers\gxm_state_funcs.cpp">
+      <Filter>Function Wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="wrappers\gxm_draw_funcs.cpp">
       <Filter>Function Wrappers</Filter>
     </ClCompile>
   </ItemGroup>

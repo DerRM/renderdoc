@@ -30,18 +30,32 @@
 #include "gxm_common.h"
 #include "gxm_resources.h"
 
+class GXMReplay;
+
 class WrappedGXM : public IFrameCapturer
 {
 private:
+  friend class GXMReplay;
   RDCDriver m_DriverType;
 
+  GXMReplay *m_Replay = NULL;
+
+  bool ProcessChunk(ReadSerialiser &ser, GXMChunk chunk);
+
 public:
+
+  WrappedGXM();
+  virtual ~WrappedGXM();
+
+  GXMReplay *GetReplay() { return m_Replay; }
+
   void SetDriverType(RDCDriver type) { m_DriverType = type; }
   RDCDriver GetDriverType() { return m_DriverType; }
   RDCDriver GetFrameCaptureDriver() { return GetDriverType(); }
   void StartFrameCapture(void *dev, void *wnd);
   bool EndFrameCapture(void *dev, void *wnd);
   bool DiscardFrameCapture(void *dev, void *wnd);
+  ReplayStatus ReadLogInitialisation(RDCFile *rdc, bool storeStructuredBuffers);
 
   IMPLEMENT_FUNCTION_SERIALISED(int, sceGxmInitialize, const SceGxmInitializeParams *params);
   IMPLEMENT_FUNCTION_SERIALISED(int, sceGxmTerminate);

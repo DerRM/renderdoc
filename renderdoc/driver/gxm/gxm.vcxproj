@@ -71,18 +71,33 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
     <IncludePath>$(SolutionDir)\breakpad;$(IncludePath)</IncludePath>
+    <TargetName>driver_$(ProjectName)</TargetName>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\obj\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(SolutionDir)\breakpad;$(IncludePath)</IncludePath>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\obj\$(ProjectName)\</IntDir>
+    <TargetName>driver_$(ProjectName)</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <SDLCheck>true</SDLCheck>
-      <ConformanceMode>true</ConformanceMode>
+      <SDLCheck>
+      </SDLCheck>
+      <ConformanceMode>false</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)renderdoc\;$(SolutionDir)renderdoc\3rdparty\</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>RENDERDOC_EXPORTS;RENDERDOC_PLATFORM_WIN32;WIN32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>precompiled.h</PrecompiledHeaderFile>
+      <DisableSpecificWarnings>4100;4201</DisableSpecificWarnings>
+      <ForcedIncludeFiles>precompiled.h</ForcedIncludeFiles>
+      <AdditionalOptions>/w44062 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -116,14 +131,19 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
+      <SDLCheck>
+      </SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)renderdoc\;$(SolutionDir)renderdoc\3rdparty\</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>RENDERDOC_EXPORTS;RENDERDOC_PLATFORM_WIN32;WIN32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <SupportJustMyCode>true</SupportJustMyCode>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -138,11 +158,17 @@
     <ClInclude Include="gxm_resources.h" />
     <ClInclude Include="official\gxm.h" />
     <ClInclude Include="official\types.h" />
+    <ClInclude Include="precompiled.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gxm_driver.cpp" />
     <ClCompile Include="gxm_replay.cpp" />
+    <ClCompile Include="precompiled.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="wrappers\gxm_buffer_funcs.cpp" />
+    <ClCompile Include="wrappers\gxm_draw_funcs.cpp" />
+    <ClCompile Include="wrappers\gxm_state_funcs.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
