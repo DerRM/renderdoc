@@ -6,6 +6,10 @@
 #include "logging.h"
 #include "network.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 uint32_t timeoutMS = 5000;
 
 static const char* sce_net_error_string(int err)
@@ -304,7 +308,7 @@ int RecvDataNonBlocking(int* socket, void *buf, uint32_t length)
       return 1;
     }
     else {
-      LOG("recv: %s : %"PRIu32"\n", sce_net_error_string(ret), (uint32_t)ret);
+      LOG("recv: %s : %" PRIu32 "\n", sce_net_error_string(ret), (uint32_t)ret);
       Shutdown(socket);
       return 0;
     }
@@ -391,3 +395,7 @@ int CreateLoopbackSocket(uint16_t port, int listen)
 
     return socket;
 }
+
+#ifdef __cplusplus
+}
+#endif

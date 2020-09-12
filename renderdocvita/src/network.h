@@ -5,6 +5,10 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern uint32_t timeoutMS;
 
 int AcceptClient(int* socket, uint32_t timeoutMilliseconds);
@@ -16,5 +20,9 @@ int CreateMulticastSocket(uint32_t bindaddr, uint16_t port);
 int CreateLoopbackSocket(uint16_t port, int listen);
 void Shutdown(int* socket);
 bool IsRecvDataWaiting(int* socket);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -19,29 +19,6 @@
 #define LOG_LOC "ux0:/tai/vitahook.log"
 #define APP_DIR "ux0:/app"
 
-static SceUID hook;
-static tai_hook_ref_t ref;
-
-int sceGxmDraw_hooked(SceGxmContext* context, SceGxmPrimitiveType primType, SceGxmIndexFormat indexType, const void* indexData, unsigned int indexCount) {
-    LOG("hello from sceGxmDraw(context: %p, primType: %d, indexType: %d, indexData: %p, indexCount: %d) ;)\n", context, primType, indexType, indexData, indexCount);
-    return TAI_CONTINUE(int, ref, context, primType, indexType, indexData, indexCount);
-}
-
-
-static tai_hook_ref_t sceNetInitRef;
-static SceUID sceNetInitHook;
-static int sceNetInitPatched(SceNetInitParam* param) {
-
-    int ret = TAI_CONTINUE(int, sceNetInitRef, param);
-    LOG("sceNetInit(param: %p) called\n", param);
-
-    //if (ret >= 0) {
-    //    serverThreadId = createThread("TargetControlServerThread", &sRemoteControlThreadInit, 0, NULL);
-   // }
-    
-    return ret;
-}
-
 typedef int(*threadfunc_t)(SceSize args, void* init);
 
 SceUID createThread(const char *thread_name, threadfunc_t thread_func, size_t user_data_size, void* user_data) 
@@ -451,35 +428,10 @@ int module_start(SceSize args, void *argp) {
     threadId = createThread("RemoteServerThread", &sThreadInit, 0, NULL);
     multicastThreadId = createThread("MulticastThread", &sMulticastInit, 0, NULL);
 
-    /*hook = taiHookFunctionImport(&ref, 
-                                TAI_MAIN_MODULE,
-                                TAI_ANY_LIBRARY,
-                                0xBC059AFC, // sceGxmDraw
-                                sceGxmDraw_hooked);*/
-
-    sceNetInitHook = taiHookFunctionExport(&sceNetInitRef, TAI_MAIN_MODULE, 0x6BF8B2A2, 0xEB03E265, sceNetInitPatched);
-    if (sceNetInitHook < 0) {
-        LOG("Could not hook sceNetInit, reason: %s\n", taihenerr2str(sceNetInitHook)); 
-    }
-    else {
-        LOG("hooked sceNetInit\n");
-    }
-
     return SCE_KERNEL_START_SUCCESS;
 }
 
 int module_stop(SceSize args, void *argp) {
     LOG("end vitahook\n");
-/*
-    if (threadId >= 0) {
-        sceKernelDeleteThread(threadId);
-    }
-
-    if (serverThreadId >= 0)
-    {
-        sceKernelWaitThreadEnd(serverThreadId, NULL, NULL);
-        sceKernelDeleteThread(serverThreadId);
-    }
-*/
     return SCE_KERNEL_STOP_SUCCESS;
 }

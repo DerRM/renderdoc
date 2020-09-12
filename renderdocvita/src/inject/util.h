@@ -3,8 +3,16 @@
 
 #include <vitasdk.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 char const* sysmodule2str(SceUInt16 id);
 char const* taihenerr2str(SceUID res);
 char const* sysmodres2str(int res);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -4,6 +4,10 @@
 #include "serializer.h"
 #include "network.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int Write(int* socket, void *data, uint32_t numBytes)
 {
     int success = SendDataBlocking(socket, data, numBytes);
@@ -71,3 +75,7 @@ int ReadBool(int* socket, uint8_t *val)
 {
     return Read(socket, val, 1);
 }
+
+#ifdef __cplusplus
+}
+#endif

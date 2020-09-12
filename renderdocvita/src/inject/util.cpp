@@ -19,6 +19,10 @@
 #define TAI_ERROR_MODULE_OVERFLOW 0x9001000C
 #define TAI_ERROR_BLOCKING 0x9001000D
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 char const* taihenerr2str(SceUID res) {
     switch (res) {
     CASE2STR(TAI_SUCCESS);
@@ -137,3 +141,7 @@ char const* sysmodres2str(int res) {
 	default: return "<invalid res>";
 	}
 }
+
+#ifdef __cplusplus
+}
+#endif

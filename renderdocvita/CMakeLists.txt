@@ -16,11 +16,11 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,-q -Wall -O3 -std=gnu99")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-q -Wall -O3 -std=c++11 -fno-rtti -fno-exceptions")
 
 add_executable(gxm_inject
-    ${CMAKE_CURRENT_LIST_DIR}/src/inject/main.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/inject/util.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/inject/main.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/inject/util.cpp
     #${CMAKE_CURRENT_LIST_DIR}/src/inject/image_write.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/network.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/serializer.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/network.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/serializer.cpp
 )
 
 
@@ -84,10 +84,10 @@ add_custom_target(suprxsend
 
 add_executable(vitahook
     src/main.c
-    src/inject/util.c
+    src/inject/util.cpp
     src/sfo.c
-    src/network.c
-    src/serializer.c
+    src/network.cpp
+    src/serializer.cpp
 )
 
 target_link_libraries(vitahook
