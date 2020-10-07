@@ -156,13 +156,16 @@
     <ClInclude Include="gxm_driver.h" />
     <ClInclude Include="gxm_replay.h" />
     <ClInclude Include="gxm_resources.h" />
+    <ClInclude Include="gxm_types.h" />
     <ClInclude Include="official\gxm.h" />
     <ClInclude Include="official\types.h" />
     <ClInclude Include="precompiled.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="gxm_common.cpp" />
     <ClCompile Include="gxm_driver.cpp" />
     <ClCompile Include="gxm_replay.cpp" />
+    <ClCompile Include="gxm_win32.cpp" />
     <ClCompile Include="precompiled.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Create</PrecompiledHeader>
     </ClCompile>

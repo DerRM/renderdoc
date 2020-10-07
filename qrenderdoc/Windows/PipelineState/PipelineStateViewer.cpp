@@ -37,6 +37,7 @@
 #include "D3D12PipelineStateViewer.h"
 #include "GLPipelineStateViewer.h"
 #include "VulkanPipelineStateViewer.h"
+#include "GXMPipelineStateViewer.h"
 #include "ui_PipelineStateViewer.h"
 
 static uint32_t byteSize(const ResourceFormat &fmt)
@@ -119,6 +120,8 @@ void PipelineStateViewer::OnCaptureLoaded()
     setToGL();
   else if(m_Ctx.APIProps().pipelineType == GraphicsAPI::Vulkan)
     setToVulkan();
+  else if(m_Ctx.APIProps().pipelineType == GraphicsAPI::GXM)
+    setToGXM();
 
   if(m_Current)
     m_Current->OnCaptureLoaded();
@@ -245,6 +248,18 @@ void PipelineStateViewer::setToVulkan()
   m_Current = m_Vulkan;
 }
 
+void PipelineStateViewer::setToGXM()
+{
+  if(m_GXM)
+    return;
+
+  reset();
+
+  m_GXM = new GXMPipelineStateViewer(m_Ctx, *this, this);
+  ui->layout->addWidget(m_GXM);
+  m_Current = m_GXM;
+}
+  
 QXmlStreamWriter *PipelineStateViewer::beginHTMLExport()
 {
   if(!m_Ctx.IsCaptureLoaded())
@@ -965,44 +980,44 @@ void PipelineStateViewer::SetupShaderEditButton(QToolButton *button, ResourceId 
     QAction *action = new QAction(label, menu);
     action->setIcon(Icons::page_white_edit());
 
-    QObject::connect(action, &QAction::triggered, [this, pipelineId, shaderId, bindpointMapping,
-                                                   shaderDetails]() {
-      QString entry;
-      QString src;
+    QObject::connect(
+        action, &QAction::triggered, [this, pipelineId, shaderId, bindpointMapping, shaderDetails]() {
+          QString entry;
+          QString src;
 
-      if(shaderDetails->encoding == ShaderEncoding::SPIRV)
-      {
-        m_Ctx.Replay().AsyncInvoke([this, pipelineId, shaderId, shaderDetails](IReplayController *r) {
-          rdcstr disasm = r->DisassembleShader(pipelineId, shaderDetails, "");
+          if(shaderDetails->encoding == ShaderEncoding::SPIRV)
+          {
+            m_Ctx.Replay().AsyncInvoke(
+                [this, pipelineId, shaderId, shaderDetails](IReplayController *r) {
+                  rdcstr disasm = r->DisassembleShader(pipelineId, shaderDetails, "");
 
-          QString editeddisasm =
-              tr("####          PSEUDOCODE SPIR-V DISASSEMBLY            ###\n") +
-              tr("#### Use a SPIR-V decompiler to get compileable source ###\n\n");
+                  QString editeddisasm =
+                      tr("####          PSEUDOCODE SPIR-V DISASSEMBLY            ###\n") +
+                      tr("#### Use a SPIR-V decompiler to get compileable source ###\n\n");
 
-          editeddisasm += disasm;
+                  editeddisasm += disasm;
 
-          GUIInvoke::call(this, [this, shaderId, shaderDetails, editeddisasm]() {
+                  GUIInvoke::call(this, [this, shaderId, shaderDetails, editeddisasm]() {
+                    rdcstrpairs files;
+                    files.push_back(rdcpair<rdcstr, rdcstr>("pseudocode", editeddisasm));
+
+                    EditShader(shaderId, shaderDetails->stage, shaderDetails->entryPoint,
+                               ShaderCompileFlags(), ShaderEncoding::Unknown, files);
+                  });
+                });
+          }
+          else if(shaderDetails->encoding == ShaderEncoding::DXBC)
+          {
+            entry = lit("EditedShader%1S").arg(ToQStr(shaderDetails->stage, GraphicsAPI::D3D11)[0]);
+
             rdcstrpairs files;
-            files.push_back(rdcpair<rdcstr, rdcstr>("pseudocode", editeddisasm));
+            files.push_back(rdcpair<rdcstr, rdcstr>(
+                "decompiled_stub.hlsl", GenerateHLSLStub(bindpointMapping, shaderDetails, entry)));
 
-            EditShader(shaderId, shaderDetails->stage, shaderDetails->entryPoint,
-                       ShaderCompileFlags(), ShaderEncoding::Unknown, files);
-          });
+            EditShader(shaderId, shaderDetails->stage, entry, ShaderCompileFlags(),
+                       ShaderEncoding::HLSL, files);
+          }
         });
-      }
-      else if(shaderDetails->encoding == ShaderEncoding::DXBC)
-      {
-        entry = lit("EditedShader%1S").arg(ToQStr(shaderDetails->stage, GraphicsAPI::D3D11)[0]);
-
-        rdcstrpairs files;
-        files.push_back(rdcpair<rdcstr, rdcstr>(
-            "decompiled_stub.hlsl", GenerateHLSLStub(bindpointMapping, shaderDetails, entry)));
-
-        EditShader(shaderId, shaderDetails->stage, entry, ShaderCompileFlags(),
-                   ShaderEncoding::HLSL, files);
-      }
-
-    });
 
     menu->addAction(action);
   }

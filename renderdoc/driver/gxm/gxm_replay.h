@@ -29,6 +29,7 @@
 #include "core/core.h"
 #include "replay/replay_driver.h"
 #include "gxm_common.h"
+#include "gxm_driver.h"
 
 class GXMReplay : IReplayDriver
 {
@@ -65,7 +66,8 @@ public:
   virtual const GLPipe::State *GetGLPipelineState();
   virtual const VKPipe::State *GetVulkanPipelineState();
 
-  virtual FrameRecord GetFrameRecord();
+  virtual FrameRecord GetFrameRecord() { return m_FrameRecord; }
+  FrameRecord &WriteFrameRecord() { return m_FrameRecord; }
 
   virtual ReplayStatus ReadLogInitialisation(RDCFile *rdc, bool storeStructuredBuffers);
   virtual void ReplayLog(uint32_t endEventID, ReplayLogType replayType);
@@ -142,9 +144,12 @@ public:
   bool IsOutputWindowVisible(uint64_t id);
   void FlipOutputWindow(uint64_t id);
 
-  bool GetMinMax(ResourceId texid, const Subresource &sub, CompType typeCast, float *minval, float *maxval);
-  bool GetHistogram(ResourceId texid, const Subresource &sub, CompType typeCast, float minval, float maxval, bool channels[4], rdcarray<uint32_t> &histogram);
-  void PickPixel(ResourceId texture, uint32_t x, uint32_t y, const Subresource &sub, CompType typeCast, float pixel[4]);
+  bool GetMinMax(ResourceId texid, const Subresource &sub, CompType typeCast, float *minval,
+                 float *maxval);
+  bool GetHistogram(ResourceId texid, const Subresource &sub, CompType typeCast, float minval,
+                    float maxval, bool channels[4], rdcarray<uint32_t> &histogram);
+  void PickPixel(ResourceId texture, uint32_t x, uint32_t y, const Subresource &sub,
+                 CompType typeCast, float pixel[4]);
 
   ResourceId CreateProxyTexture(const TextureDescription &templateTex);
   void SetProxyTextureData(ResourceId texid, const Subresource &sub, byte *data, size_t dataSize);
@@ -153,21 +158,78 @@ public:
   ResourceId CreateProxyBuffer(const BufferDescription &templateBuf);
   void SetProxyBufferData(ResourceId bufid, byte *data, size_t dataSize);
 
-  void RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &secondaryDraws, const MeshDisplay &cfg);
+  void RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &secondaryDraws,
+                  const MeshDisplay &cfg);
   bool RenderTexture(TextureDisplay cfg);
 
-  void BuildCustomShader(ShaderEncoding sourceEncoding, const bytebuf &source, const rdcstr &entry, const ShaderCompileFlags &compileFlags, ShaderStage type, ResourceId &id, rdcstr &errors);
+  void BuildCustomShader(ShaderEncoding sourceEncoding, const bytebuf &source, const rdcstr &entry,
+                         const ShaderCompileFlags &compileFlags, ShaderStage type, ResourceId &id,
+                         rdcstr &errors);
   rdcarray<ShaderEncoding> GetCustomShaderEncodings();
-  ResourceId ApplyCustomShader(ResourceId shader, ResourceId texid, const Subresource &sub, CompType typeCast);
+  ResourceId ApplyCustomShader(ResourceId shader, ResourceId texid, const Subresource &sub,
+                               CompType typeCast);
   void FreeCustomShader(ResourceId id);
 
   void RenderCheckerboard();
 
   void RenderHighlightBox(float w, float h, float scale);
 
-  uint32_t PickVertex(uint32_t eventId, int32_t width, int32_t height, const MeshDisplay &cfg, uint32_t x, uint32_t y);
+  uint32_t PickVertex(uint32_t eventId, int32_t width, int32_t height, const MeshDisplay &cfg,
+                      uint32_t x, uint32_t y);
+
+  struct OutputWindow
+  {
+    OutputWindow();
+
+    void Create(WrappedGXM *driver, bool depth);
+    void Destroy(WrappedGXM *driver);
+
+    // implemented in vk_replay_platform.cpp
+    void CreateSurface(WrappedGXM *driver);
+    void SetWindowHandle(WindowingData window);
+
+    WindowingSystem m_WindowSystem;
+
+    // WINDOW_HANDLE_DECL;
+
+    bool fresh = true;
+    bool outofdate = false;
+
+    uint32_t width, height;
+
+    bool hasDepth;
+
+    int failures;
+    int recreatePause;
+
+    /*
+    VkSurfaceKHR surface;
+    VkSwapchainKHR swap;
+    uint32_t numImgs;
+    VkImage colimg[8];
+    VkImageMemoryBarrier colBarrier[8];
+
+    VkImage bb;
+    VkImageView bbview;
+    VkDeviceMemory bbmem;
+    VkImageMemoryBarrier bbBarrier;
+    VkFramebuffer fb, fbdepth;
+    VkRenderPass rp, rpdepth;
+    uint32_t curidx;
+
+    VkImage resolveimg;
+    VkDeviceMemory resolvemem;
+
+    VkImage dsimg;
+    VkDeviceMemory dsmem;
+    VkImageView dsview;
+    VkImageMemoryBarrier depthBarrier;
+    */
+  };
 
 private:
   SDFile m_file;
   WrappedGXM *m_pDriver;
+  FrameRecord m_FrameRecord;
+  uint64_t m_OutputWinID;
 };

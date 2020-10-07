@@ -553,6 +553,7 @@ void RenderDoc::InitialiseReplay(GlobalEnvironment env, const rdcarray<rdcstr> &
           case GraphicsAPI::D3D12: driverType = RDCDriver::D3D12; break;
           case GraphicsAPI::OpenGL: break;
           case GraphicsAPI::Vulkan: driverType = RDCDriver::Vulkan; break;
+          case GraphicsAPI::GXM: driverType = RDCDriver::GXM; break;
         }
 
         if(driverType == RDCDriver::Unknown || !HasReplayDriver(driverType))
@@ -1539,6 +1540,7 @@ DriverInformation RenderDoc::GetDriverInformation(GraphicsAPI api)
     case GraphicsAPI::D3D12: driverType = RDCDriver::D3D12; break;
     case GraphicsAPI::OpenGL: driverType = RDCDriver::OpenGL; break;
     case GraphicsAPI::Vulkan: driverType = RDCDriver::Vulkan; break;
+    case GraphicsAPI::GXM: driverType = RDCDriver::GXM; break;
   }
 
   if(driverType == RDCDriver::Unknown || !HasReplayDriver(driverType))

@@ -70,7 +70,14 @@ ReplayStatus WrappedGXM::ReadLogInitialisation(RDCFile *rdc, bool storeStructure
       break;
   }
 
+  m_Replay->WriteFrameRecord().drawcallList = m_Drawcalls;
+
   return ReplayStatus::Succeeded;
+}
+
+void WrappedGXM::AddDrawcall(const DrawcallDescription &d) 
+{
+  m_Drawcalls.push_back(d);
 }
 
 bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
@@ -83,7 +90,8 @@ bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
     case GXMChunk::vrapi_CreateTextureSwapChain2: break;
     case GXMChunk::sceGxmAddRazorGpuCaptureBuffer: break;
     case GXMChunk::sceGxmBeginCommandList: break;
-    case GXMChunk::sceGxmBeginScene: break;
+    case GXMChunk::sceGxmBeginScene: 
+      return Serialise_sceGxmBeginScene(ser, 0, 0, 0, 0, 0, 0, 0, 0);
     case GXMChunk::sceGxmBeginSceneEx: break;
     case GXMChunk::sceGxmColorSurfaceGetClip: break;
     case GXMChunk::sceGxmColorSurfaceGetData: break;
@@ -123,14 +131,16 @@ bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
     case GXMChunk::sceGxmDestroyContext: break;
     case GXMChunk::sceGxmDestroyDeferredContext: break;
     case GXMChunk::sceGxmDestroyRenderTarget: break;
-    case GXMChunk::sceGxmDisplayQueueAddEntry: break;
+    case GXMChunk::sceGxmDisplayQueueAddEntry: 
+      return Serialise_sceGxmDisplayQueueAddEntry(ser, 0, 0, 0);
     case GXMChunk::sceGxmDisplayQueueFinish: break;
     case GXMChunk::sceGxmDraw:
       return Serialise_sceGxmDraw(ser, 0, (SceGxmPrimitiveType)0, (SceGxmIndexFormat)0, 0, 0);
     case GXMChunk::sceGxmDrawInstanced: break;
     case GXMChunk::sceGxmDrawPrecomputed: break;
     case GXMChunk::sceGxmEndCommandList: break;
-    case GXMChunk::sceGxmEndScene: break;
+    case GXMChunk::sceGxmEndScene: 
+      return Serialise_sceGxmEndScene(ser, 0, 0, 0);
     case GXMChunk::sceGxmExecuteCommandList: break;
     case GXMChunk::sceGxmFinish: break;
     case GXMChunk::sceGxmFragmentProgramGetPassType: break;
@@ -154,7 +164,8 @@ bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
     case GXMChunk::sceGxmMapVertexUsseMemory: break;
     case GXMChunk::sceGxmMidSceneFlush: break;
     case GXMChunk::sceGxmNotificationWait: break;
-    case GXMChunk::sceGxmPadHeartbeat: break;
+    case GXMChunk::sceGxmPadHeartbeat: 
+      return Serialise_sceGxmPadHeartbeat(ser, 0, 0);
     case GXMChunk::sceGxmPadTriggerGpuPaTrace: break;
     case GXMChunk::sceGxmPopUserMarker: break;
     case GXMChunk::sceGxmPrecomputedDrawInit: break;
@@ -210,8 +221,10 @@ bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
     case GXMChunk::sceGxmRemoveRazorGpuCaptureBuffer: break;
     case GXMChunk::sceGxmRenderTargetGetDriverMemBlock: break;
     case GXMChunk::sceGxmRenderTargetGetHostMem: break;
-    case GXMChunk::sceGxmReserveFragmentDefaultUniformBuffer: break;
-    case GXMChunk::sceGxmReserveVertexDefaultUniformBuffer: break;
+    case GXMChunk::sceGxmReserveFragmentDefaultUniformBuffer: 
+      return Serialise_sceGxmReserveFragmentDefaultUniformBuffer(ser, 0, 0);
+    case GXMChunk::sceGxmReserveVertexDefaultUniformBuffer: 
+      return Serialise_sceGxmReserveVertexDefaultUniformBuffer(ser, 0, 0);
     case GXMChunk::sceGxmSetAuxiliarySurface: break;
     case GXMChunk::sceGxmSetBackDepthBias: break;
     case GXMChunk::sceGxmSetBackDepthFunc: break;
@@ -231,18 +244,24 @@ bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
     case GXMChunk::sceGxmSetDeferredContextVdmBuffer: break;
     case GXMChunk::sceGxmSetDeferredContextVertexBuffer: break;
     case GXMChunk::sceGxmSetFragmentDefaultUniformBuffer: break;
-    case GXMChunk::sceGxmSetFragmentProgram: break;
+    case GXMChunk::sceGxmSetFragmentProgram: 
+      return Serialise_sceGxmSetFragmentProgram(ser, 0, 0);
     case GXMChunk::sceGxmSetFragmentTexture: break;
     case GXMChunk::sceGxmSetFragmentUniformBuffer: break;
     case GXMChunk::sceGxmSetFrontDepthBias: break;
-    case GXMChunk::sceGxmSetFrontDepthFunc: break;
-    case GXMChunk::sceGxmSetFrontDepthWriteEnable: break;
+    case GXMChunk::sceGxmSetFrontDepthFunc: 
+      return Serialise_sceGxmSetFrontDepthFunc(ser, 0, (SceGxmDepthFunc)0);
+    case GXMChunk::sceGxmSetFrontDepthWriteEnable: 
+      return Serialise_sceGxmSetFrontDepthWriteEnable(ser, 0, (SceGxmDepthWriteMode)0);
     case GXMChunk::sceGxmSetFrontFragmentProgramEnable: break;
     case GXMChunk::sceGxmSetFrontLineFillLastPixelEnable: break;
     case GXMChunk::sceGxmSetFrontPointLineWidth: break;
     case GXMChunk::sceGxmSetFrontPolygonMode: break;
-    case GXMChunk::sceGxmSetFrontStencilFunc: break;
-    case GXMChunk::sceGxmSetFrontStencilRef: break;
+    case GXMChunk::sceGxmSetFrontStencilFunc: 
+      return Serialise_sceGxmSetFrontStencilFunc(ser, 0, (SceGxmStencilFunc)0, (SceGxmStencilOp)0,
+                                                 (SceGxmStencilOp)0, (SceGxmStencilOp)0, 0, 0);
+    case GXMChunk::sceGxmSetFrontStencilRef: 
+      return Serialise_sceGxmSetFrontStencilRef(ser, 0, 0);
     case GXMChunk::sceGxmSetFrontVisibilityTestEnable: break;
     case GXMChunk::sceGxmSetFrontVisibilityTestIndex: break;
     case GXMChunk::sceGxmSetFrontVisibilityTestOp: break;
@@ -250,12 +269,15 @@ bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
     case GXMChunk::sceGxmSetPrecomputedVertexState: break;
     case GXMChunk::sceGxmSetRegionClip: break;
     case GXMChunk::sceGxmSetTwoSidedEnable: break;
-    case GXMChunk::sceGxmSetUniformDataF: break;
+    case GXMChunk::sceGxmSetUniformDataF: 
+      return Serialise_sceGxmSetUniformDataF(ser, 0, 0, 0, 0, 0);
     case GXMChunk::sceGxmSetUserMarker: break;
     case GXMChunk::sceGxmSetValidationEnable: break;
     case GXMChunk::sceGxmSetVertexDefaultUniformBuffer: break;
-    case GXMChunk::sceGxmSetVertexProgram: break;
-    case GXMChunk::sceGxmSetVertexStream: break;
+    case GXMChunk::sceGxmSetVertexProgram: 
+      return Serialise_sceGxmSetVertexProgram(ser, 0, 0);
+    case GXMChunk::sceGxmSetVertexStream: 
+      return Serialise_sceGxmSetVertexStream(ser, 0, 0, 0);
     case GXMChunk::sceGxmSetVertexTexture: break;
     case GXMChunk::sceGxmSetVertexUniformBuffer: break;
     case GXMChunk::sceGxmSetViewport: break;
@@ -356,6 +378,17 @@ bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
 WrappedGXM::WrappedGXM() 
 {
   m_Replay = new GXMReplay(this);
+
+  if(RenderDoc::Inst().IsReplayApp())
+  {
+    m_State = CaptureState::LoadingReplaying;
+  }
+  else
+  {
+    m_State = CaptureState::BackgroundCapturing;
+  }
+
+  m_CurEventID = 0;
 }
 
 WrappedGXM::~WrappedGXM() 

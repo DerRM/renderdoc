@@ -29,6 +29,7 @@ obj/
 *.sln.ide/
 *.so
 *.a
+*.log
 *.exp
 *.lib
 *.sdf

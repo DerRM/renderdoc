@@ -16,6 +16,7 @@ extern "C" {
 #include "../serializer.h"
 #include "../kernel/api.h"
 
+#include "../../../renderdoc/driver/gxm/gxm_types.h"
 
 struct FileHeader {
     uint64_t magic;
@@ -75,7 +76,7 @@ uint32_t g_frameCount = 0;
 uint32_t g_logFrameCount = 0;
 uint32_t g_displayWaitCount = 0;
 
-//#define PRINT_LOG
+#define PRINT_LOG
 
 #undef LOGD
 #ifdef PRINT_LOG
@@ -394,7 +395,25 @@ CREATE_PATCHED_CALL(int, sceGxmBeginCommandList, SceGxmContext *deferredContext)
 
 CREATE_PATCHED_CALL(int, sceGxmBeginScene, SceGxmContext *context, unsigned int flags, const SceGxmRenderTarget *renderTarget, const SceGxmValidRegion *validRegion, SceGxmSyncObject *vertexSyncObject, SceGxmSyncObject *fragmentSyncObject, const SceGxmColorSurface *colorSurface, const SceGxmDepthStencilSurface *depthStencil)
 {
-    LOGD("sceGxmBeginScene(context: %p, flags: %d, rendertarget: %p, validRegion: %p, vertexSyncObject: %p, fragmentSyncObject: %p, colorSurface: %p, depthStencil: %p)\n", context, flags, renderTarget, validRegion, vertexSyncObject, fragmentSyncObject, colorSurface, depthStencil);
+    if (g_log) {
+
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmBeginScene;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
+        kuIoWrite(g_fd, &flags, sizeof(uint32_t));
+        kuIoWrite(g_fd, &renderTarget, sizeof(SceGxmRenderTarget *));
+        kuIoWrite(g_fd, &validRegion, sizeof(SceGxmValidRegion *));
+        kuIoWrite(g_fd, &vertexSyncObject, sizeof(SceGxmSyncObject *));
+        kuIoWrite(g_fd, &fragmentSyncObject, sizeof(SceGxmSyncObject *));
+        kuIoWrite(g_fd, &colorSurface, sizeof(SceGxmColorSurface *));
+        kuIoWrite(g_fd, &depthStencil, sizeof(SceGxmDepthStencilSurface *));
+        g_fileoffset += 40;
+        LOG("sceGxmBeginScene(context: %p, flags: %d, rendertarget: %p, validRegion: %p, vertexSyncObject: %p, fragmentSyncObject: %p, colorSurface: %p, depthStencil: %p)\n", context, flags, renderTarget, validRegion, vertexSyncObject, fragmentSyncObject, colorSurface, depthStencil);
+    }
+
     return TAI_NEXT(sceGxmBeginScene, sceGxmBeginSceneRef, context, flags, renderTarget, validRegion, vertexSyncObject, fragmentSyncObject, colorSurface, depthStencil);
 }
 
@@ -645,8 +664,20 @@ char fname[256];
 
 CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer, SceGxmSyncObject *newBuffer, const void *callbackData)
 {
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmDisplayQueueAddEntry;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &oldBuffer, sizeof(SceGxmSyncObject *));
+        kuIoWrite(g_fd, &newBuffer, sizeof(SceGxmSyncObject *));
+        kuIoWrite(g_fd, &callbackData, sizeof(void *));
+        g_fileoffset += 20;
+        LOGD("sceGxmDisplayQueueAddEntry(oldBuffer: %p, newBuffer: %p, callbackData: %p)\n", oldBuffer, newBuffer, callbackData);
+    }
+
     int ret = TAI_NEXT(sceGxmDisplayQueueAddEntry, sceGxmDisplayQueueAddEntryRef, oldBuffer, newBuffer, callbackData);
-    LOGD("sceGxmDisplayQueueAddEntry(oldBuffer: %p, newBuffer: %p, callbackData: %p)\n", oldBuffer, newBuffer, callbackData);
     
     if (g_log) {
         g_log = 0;
@@ -724,15 +755,17 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueFinish)
 CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType primType, SceGxmIndexFormat indexType, const void* indexData, unsigned int indexCount)
 {
     if (g_log) {
-        uint32_t buffer[64];
-        memset(&buffer[0], 0, 64);
-        uint32_t type = 1048U;
-        kuIoWrite(g_fd, &type, sizeof(uint32_t));
-        kuIoWrite(g_fd, &buffer[0], 4);
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmDraw;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &context, sizeof(context));
         kuIoWrite(g_fd, &primType, sizeof(SceGxmPrimitiveType));
         kuIoWrite(g_fd, &indexType, sizeof(SceGxmIndexFormat));
+        kuIoWrite(g_fd, &indexData, sizeof(void*));
         kuIoWrite(g_fd, &indexCount, sizeof(uint32_t));
-        g_fileoffset += 20;
+        g_fileoffset += 28;
         LOG("sceGxmDraw(context: %p, primType: %" PRIu32 ", indexType: %" PRIu32 ", indexData: %p, indexCount: %" PRIu32 ")\n", context, primType, indexType, indexData, indexCount);
     }
 
@@ -760,7 +793,19 @@ CREATE_PATCHED_CALL(int, sceGxmEndCommandList, SceGxmContext *deferredContext, S
 
 CREATE_PATCHED_CALL(int, sceGxmEndScene, SceGxmContext *context, const SceGxmNotification *vertexNotification, const SceGxmNotification *fragmentNotification)
 {
-    LOGD("sceGxmEndScene(context: %p, flags: %" PRIu32 ", vertexNotification: %p, fragmentNotification: %p)\n", context, vertexNotification, fragmentNotification);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmEndScene;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
+        kuIoWrite(g_fd, &vertexNotification, sizeof(SceGxmNotification *));
+        kuIoWrite(g_fd, &fragmentNotification, sizeof(SceGxmNotification *));
+        g_fileoffset += 20;
+        LOGD("sceGxmEndScene(context: %p, flags: %" PRIu32 ", vertexNotification: %p, fragmentNotification: %p)\n", context, vertexNotification, fragmentNotification);
+    }
+
     return TAI_NEXT(sceGxmEndScene, sceGxmEndSceneRef, context, vertexNotification, fragmentNotification);
 }
 
@@ -938,7 +983,18 @@ CREATE_PATCHED_CALL(int, sceGxmNotificationWait, const SceGxmNotification *notif
 
 CREATE_PATCHED_CALL(int, sceGxmPadHeartbeat, const SceGxmColorSurface *displaySurface, SceGxmSyncObject *displaySyncObject)
 {
-    LOGD("sceGxmPadHeartbeat(displaySurface: %p, displaySyncObject: %p)\n", displaySurface, displaySyncObject);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmPadHeartbeat;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &displaySurface, sizeof(SceGxmColorSurface *));
+        kuIoWrite(g_fd, &displaySyncObject, sizeof(SceGxmSyncObject *));
+        g_fileoffset += 16;
+        LOGD("sceGxmPadHeartbeat(displaySurface: %p, displaySyncObject: %p)\n", displaySurface, displaySyncObject);
+    }
+
     return TAI_NEXT(sceGxmPadHeartbeat, sceGxmPadHeartbeatRef, displaySurface, displaySyncObject);
 }
 
@@ -1282,13 +1338,35 @@ CREATE_PATCHED_CALL(int, sceGxmRenderTargetGetHostMem, const SceGxmRenderTarget 
 
 CREATE_PATCHED_CALL(int, sceGxmReserveFragmentDefaultUniformBuffer, SceGxmContext *context, void **uniformBuffer)
 {
-    LOGD("sceGxmReserveFragmentDefaultUniformBuffer(context: %p, uniformBuffer: %p)\n", context, uniformBuffer);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmReserveFragmentDefaultUniformBuffer;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
+        kuIoWrite(g_fd, &uniformBuffer, sizeof(void **));
+        g_fileoffset += 16;
+        LOG("sceGxmReserveFragmentDefaultUniformBuffer(context: %p, uniformBuffer: %p)\n", context, uniformBuffer);
+    }
+
     return TAI_NEXT(sceGxmReserveFragmentDefaultUniformBuffer, sceGxmReserveFragmentDefaultUniformBufferRef, context, uniformBuffer);
 }
 
 CREATE_PATCHED_CALL(int, sceGxmReserveVertexDefaultUniformBuffer, SceGxmContext *context, void **uniformBuffer)
 {
-    LOGD("sceGxmReserveVertexDefaultUniformBuffer(context: %p, uniformBuffer: %p)\n", context, uniformBuffer);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmReserveVertexDefaultUniformBuffer;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
+        kuIoWrite(g_fd, &uniformBuffer, sizeof(void **));
+        g_fileoffset += 16;
+        LOG("sceGxmReserveVertexDefaultUniformBuffer(context: %p, uniformBuffer: %p)\n", context, uniformBuffer);
+    }
+
     return TAI_NEXT(sceGxmReserveVertexDefaultUniformBuffer, sceGxmReserveVertexDefaultUniformBufferRef, context, uniformBuffer);
 }
 
@@ -1413,7 +1491,18 @@ CREATE_PATCHED_CALL(int, sceGxmSetFragmentDefaultUniformBuffer, SceGxmContext *c
 
 CREATE_PATCHED_CALL(void, sceGxmSetFragmentProgram, SceGxmContext *context, const SceGxmFragmentProgram *fragmentProgram)
 {
-    LOGD("sceGxmSetFragmentProgram(context: %p, fragmentProgram: %p)\n", context, fragmentProgram);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmSetFragmentProgram;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
+        kuIoWrite(g_fd, &fragmentProgram, sizeof(SceGxmFragmentProgram *));
+        g_fileoffset += 16;
+        LOG("sceGxmSetFragmentProgram(context: %p, fragmentProgram: %p)\n", context, fragmentProgram);
+    }
+
     TAI_NEXT(sceGxmSetFragmentProgram, sceGxmSetFragmentProgramRef, context, fragmentProgram);
 }
 
@@ -1437,13 +1526,36 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontDepthBias, SceGxmContext *context, int f
 
 CREATE_PATCHED_CALL(void, sceGxmSetFrontDepthFunc, SceGxmContext *context, SceGxmDepthFunc depthFunc)
 {
-    LOGD("sceGxmSetFrontDepthFunc(context: %p, depthFunc: %" PRIu32 ")\n", context, depthFunc);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmSetFrontDepthFunc;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
+        kuIoWrite(g_fd, &depthFunc, sizeof(SceGxmDepthFunc));
+        g_fileoffset += 16;
+        LOG("sceGxmSetFrontDepthFunc(context: %p, depthFunc: %" PRIu32 ")\n", context, depthFunc);
+    }
+
     TAI_NEXT(sceGxmSetFrontDepthFunc, sceGxmSetFrontDepthFuncRef, context, depthFunc);
 }
 
 CREATE_PATCHED_CALL(void, sceGxmSetFrontDepthWriteEnable, SceGxmContext *context, SceGxmDepthWriteMode enable)
 {
-    LOGD("sceGxmSetFrontDepthWriteEnable(context: %p, enable: %" PRIu32 ")\n", context, enable);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmSetFrontDepthWriteEnable;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
+        kuIoWrite(g_fd, &enable, sizeof(SceGxmDepthWriteMode));
+        g_fileoffset += 16;
+        LOG("sceGxmSetFrontDepthWriteEnable(context: %p, enable: %" PRIu32 ")\n", context, enable);
+
+    }
+
     TAI_NEXT(sceGxmSetFrontDepthWriteEnable, sceGxmSetFrontDepthWriteEnableRef, context, enable);
 }
 
@@ -1473,13 +1585,40 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontPolygonMode, SceGxmContext *context, Sce
 
 CREATE_PATCHED_CALL(void, sceGxmSetFrontStencilFunc, SceGxmContext *context, SceGxmStencilFunc func, SceGxmStencilOp stencilFail, SceGxmStencilOp depthFail, SceGxmStencilOp depthPass, unsigned char compareMask, unsigned char writeMask)
 {
-    LOGD("sceGxmSetFrontStencilFunc(context: %p, func: %" PRIu32 ", stencilFail: %" PRIu32 ", depthFail: %" PRIu32 ", depthPass: %" PRIu32 ", compareMask: %" PRIu32 ", writeMask: %" PRIu32 ")\n", context, func, stencilFail, depthFail, depthPass, compareMask, writeMask);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmSetFrontStencilFunc;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
+        kuIoWrite(g_fd, &func, sizeof(SceGxmStencilFunc));
+        kuIoWrite(g_fd, &stencilFail, sizeof(SceGxmStencilOp));
+        kuIoWrite(g_fd, &depthFail, sizeof(SceGxmStencilOp));
+        kuIoWrite(g_fd, &depthPass, sizeof(SceGxmStencilOp));
+        kuIoWrite(g_fd, &compareMask, sizeof(uint8_t));
+        kuIoWrite(g_fd, &writeMask, sizeof(uint8_t));
+        g_fileoffset += 21;
+        LOG("sceGxmSetFrontStencilFunc(context: %p, func: %" PRIu32 ", stencilFail: %" PRIu32 ", depthFail: %" PRIu32 ", depthPass: %" PRIu32 ", compareMask: %" PRIu8 ", writeMask: %" PRIu8 ")\n", context, func, stencilFail, depthFail, depthPass, compareMask, writeMask);
+    }
+
     TAI_NEXT(sceGxmSetFrontStencilFunc, sceGxmSetFrontStencilFuncRef, context, func, stencilFail, depthFail, depthPass, compareMask, writeMask);
 }
 
 CREATE_PATCHED_CALL(void, sceGxmSetFrontStencilRef, SceGxmContext *context, unsigned int sref)
 {
-    LOGD("sceGxmSetFrontStencilRef(context: %p, sref: %" PRIu32 ")\n", context, sref);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmSetFrontStencilRef;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
+        kuIoWrite(g_fd, &sref, sizeof(uint32_t));
+        g_fileoffset += 16;
+        LOG("sceGxmSetFrontStencilRef(context: %p, sref: %" PRIu32 ")\n", context, sref);
+    }
+
     TAI_NEXT(sceGxmSetFrontStencilRef, sceGxmSetFrontStencilRefRef, context, sref);
 }
 
@@ -1527,7 +1666,21 @@ CREATE_PATCHED_CALL(void, sceGxmSetTwoSidedEnable, SceGxmContext *context, SceGx
 
 CREATE_PATCHED_CALL(int, sceGxmSetUniformDataF, void *uniformBuffer, const SceGxmProgramParameter *parameter, unsigned int componentOffset, unsigned int componentCount, const float *sourceData)
 {
-    LOGD("sceGxmSetUniformDataF(uniformBuffer, %p, parameter: %p, componentOffset: %" PRIu32 ", componentCount: %" PRIu32 ", sourceData: %p)\n", uniformBuffer, parameter, componentOffset, componentCount, sourceData);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmSetUniformDataF;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &uniformBuffer, sizeof(void *));
+        kuIoWrite(g_fd, &parameter, sizeof(SceGxmProgramParameter *));
+        kuIoWrite(g_fd, &componentOffset, sizeof(uint32_t));
+        kuIoWrite(g_fd, &componentCount, sizeof(uint32_t));
+        kuIoWrite(g_fd, &sourceData, sizeof(float *));
+        g_fileoffset += 28;
+        LOG("sceGxmSetUniformDataF(uniformBuffer, %p, parameter: %p, componentOffset: %" PRIu32 ", componentCount: %" PRIu32 ", sourceData: %p)\n", uniformBuffer, parameter, componentOffset, componentCount, sourceData);
+    }
+
     return TAI_NEXT(sceGxmSetUniformDataF, sceGxmSetUniformDataFRef, uniformBuffer, parameter, componentOffset, componentCount, sourceData);
 }
 
@@ -1552,13 +1705,36 @@ CREATE_PATCHED_CALL(int, sceGxmSetVertexDefaultUniformBuffer, SceGxmContext *con
 
 CREATE_PATCHED_CALL(void, sceGxmSetVertexProgram, SceGxmContext *context, const SceGxmVertexProgram *vertexProgram)
 {
-    LOGD("sceGxmSetVertexProgram(context: %p, vertexProgram: %p)\n", context, vertexProgram);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmSetVertexProgram;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
+        kuIoWrite(g_fd, &vertexProgram, sizeof(SceGxmVertexProgram *));
+        g_fileoffset += 16;
+        LOG("sceGxmSetVertexProgram(context: %p, vertexProgram: %p)\n", context, vertexProgram);
+    }
+
     TAI_NEXT(sceGxmSetVertexProgram, sceGxmSetVertexProgramRef, context, vertexProgram);
 }
 
 CREATE_PATCHED_CALL(int, sceGxmSetVertexStream, SceGxmContext *context, unsigned int streamIndex, const void *streamData)
 {
-    LOGD("sceGxmSetVertexStream(context: %p, streamIndex: %" PRIu32 ", streamData: %p)\n", context, streamIndex, streamData);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmSetVertexStream;
+        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
+        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
+        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
+        kuIoWrite(g_fd, &streamIndex, sizeof(uint32_t));
+        kuIoWrite(g_fd, &streamData, sizeof(void *));
+        g_fileoffset += 20;
+        LOG("sceGxmSetVertexStream(context: %p, streamIndex: %" PRIu32 ", streamData: %p)\n", context, streamIndex, streamData);
+    }
+
     return TAI_NEXT(sceGxmSetVertexStream, sceGxmSetVertexStreamRef, context, streamIndex, streamData);
 }
 

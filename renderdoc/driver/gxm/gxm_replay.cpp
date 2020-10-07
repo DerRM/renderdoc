@@ -177,7 +177,9 @@ rdcarray<WindowingSystem> GXMReplay::GetSupportedWindowSystems()
 
 uint64_t GXMReplay::MakeOutputWindow(WindowingData window, bool depth)
 {
-  return uint64_t();
+  uint64_t id = m_OutputWinID;
+  m_OutputWinID++;
+  return id;
 }
 
 void GXMReplay::DestroyOutputWindow(uint64_t id) {}
@@ -189,8 +191,6 @@ bool GXMReplay::CheckResizeOutputWindow(uint64_t id)
 
 void GXMReplay::SetOutputWindowDimensions(uint64_t id, int32_t w, int32_t h) {}
 
-void GXMReplay::GetOutputWindowDimensions(uint64_t id, int32_t &w, int32_t &h) {}
-
 void GXMReplay::GetOutputWindowData(uint64_t id, bytebuf &retData) {}
 
 void GXMReplay::ClearOutputWindowColor(uint64_t id, FloatVector col) {}
@@ -198,11 +198,6 @@ void GXMReplay::ClearOutputWindowColor(uint64_t id, FloatVector col) {}
 void GXMReplay::ClearOutputWindowDepth(uint64_t id, float depth, uint8_t stencil) {}
 
 void GXMReplay::BindOutputWindow(uint64_t id, bool depth) {}
-
-bool GXMReplay::IsOutputWindowVisible(uint64_t id)
-{
-  return false;
-}
 
 void GXMReplay::FlipOutputWindow(uint64_t id) {}
 
@@ -303,13 +298,22 @@ static DriverRegistration GXMDriverRegistration(RDCDriver::GXM, &GXM_CreateRepla
 GXMReplay::GXMReplay(WrappedGXM *d)
 {
   m_pDriver = d;
+  m_OutputWinID = 1;
 }
 
 void GXMReplay::Shutdown() {}
 
 APIProperties GXMReplay::GetAPIProperties()
 {
-  return APIProperties();
+  APIProperties ret;
+
+  ret.pipelineType = GraphicsAPI::GXM;
+  ret.localRenderer = GraphicsAPI::GXM;
+  ret.degraded = false;
+  ret.vendor = GPUVendor::Imagination;
+  ret.shadersMutable = false;
+
+  return ret;
 }
 
 rdcarray<ResourceDescription> GXMReplay::GetResources()
@@ -388,9 +392,4 @@ const GLPipe::State *GXMReplay::GetGLPipelineState()
 const VKPipe::State *GXMReplay::GetVulkanPipelineState()
 {
   return nullptr;
-}
-
-FrameRecord GXMReplay::GetFrameRecord()
-{
-  return FrameRecord();
 }

@@ -38,9 +38,10 @@ private:
   friend class GXMReplay;
   RDCDriver m_DriverType;
 
+  CaptureState m_State;
   GXMReplay *m_Replay = NULL;
-
-  bool ProcessChunk(ReadSerialiser &ser, GXMChunk chunk);
+  rdcarray<DrawcallDescription> m_Drawcalls;
+  uint32_t m_CurEventID;
 
 public:
 
@@ -56,6 +57,12 @@ public:
   bool EndFrameCapture(void *dev, void *wnd);
   bool DiscardFrameCapture(void *dev, void *wnd);
   ReplayStatus ReadLogInitialisation(RDCFile *rdc, bool storeStructuredBuffers);
+
+private:
+  void AddDrawcall(const DrawcallDescription &d);
+  bool ProcessChunk(ReadSerialiser &ser, GXMChunk chunk);
+
+public:
 
   IMPLEMENT_FUNCTION_SERIALISED(int, sceGxmInitialize, const SceGxmInitializeParams *params);
   IMPLEMENT_FUNCTION_SERIALISED(int, sceGxmTerminate);

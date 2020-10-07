@@ -1601,6 +1601,7 @@ enum class GraphicsAPI : uint32_t
   D3D12,
   OpenGL,
   Vulkan,
+  GXM,
 };
 
 DECLARE_REFLECTION_ENUM(GraphicsAPI);

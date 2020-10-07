@@ -16,8 +16,11 @@
     <Filter Include="PCH">
       <UniqueIdentifier>{4e9ed5f9-73dc-4408-86bd-f1458af676c7}</UniqueIdentifier>
     </Filter>
-    <Filter Include="NewFilter1">
-      <UniqueIdentifier>{e3eec8c6-f1f7-4aef-9d28-cd83b678afa9}</UniqueIdentifier>
+    <Filter Include="OS">
+      <UniqueIdentifier>{600e5451-59b3-40d6-804a-62f0c495852a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="OS\Win32">
+      <UniqueIdentifier>{e91e73a2-89a3-4d65-a076-c4d1c75c3757}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -38,6 +41,9 @@
     <ClInclude Include="precompiled.h">
       <Filter>PCH</Filter>
     </ClInclude>
+    <ClInclude Include="gxm_types.h">
+      <Filter>Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gxm_driver.cpp">
@@ -57,6 +63,12 @@
     </ClCompile>
     <ClCompile Include="wrappers\gxm_draw_funcs.cpp">
       <Filter>Function Wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="gxm_common.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="gxm_win32.cpp">
+      <Filter>OS\Win32</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

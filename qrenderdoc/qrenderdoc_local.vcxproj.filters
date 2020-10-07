@@ -729,6 +729,12 @@
     <ClCompile Include="Code\BufferFormatter.cpp">
       <Filter>Code</Filter>
     </ClCompile>
+    <ClCompile Include="Windows\PipelineState\GXMPipelineStateViewer.cpp">
+      <Filter>Windows\PipelineState</Filter>
+    </ClCompile>
+    <ClCompile Include="..\x64\Development\obj\qrenderdoc\generated\moc_GXMPipelineStateViewer.cpp">
+      <Filter>Generated Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="3rdparty\flowlayout\FlowLayout.h">
@@ -1479,6 +1485,12 @@
       <Filter>Widgets</Filter>
     </CustomBuild>
     <CustomBuild Include="Widgets\ReplayOptionsSelector.ui" />
+    <CustomBuild Include="Windows\PipelineState\GXMPipelineStateViewer.ui">
+      <Filter>Windows\PipelineState</Filter>
+    </CustomBuild>
+    <CustomBuild Include="Windows\PipelineState\GXMPipelineStateViewer.h">
+      <Filter>Windows\PipelineState</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Resources\action.png">
