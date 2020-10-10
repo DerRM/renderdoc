@@ -19,6 +19,10 @@
 #define LOG_LOC "ux0:/tai/vitahook.log"
 #define APP_DIR "ux0:/app"
 
+static uint32_t g_clientthread_running = 0;
+static uint32_t g_multicastthread_running = 0;
+static uint32_t g_serverthread_running = 0;
+
 typedef int(*threadfunc_t)(SceSize args, void* init);
 
 SceUID createThread(const char *thread_name, threadfunc_t thread_func, size_t user_data_size, void* user_data) 
@@ -343,47 +347,43 @@ static int sClientThreadInit(SceSize args, void *init)
 static int sThreadInit(SceSize args, void *init)
 {
     uint32_t port = RENDERDOC_SERVER_PORT;
-    int socket = CreateSocket("0.0.0.0", port & 0xffff, 4);
+    g_serverthread_running = 1;
 
-    while (socket < 0) 
+    while (g_serverthread_running) 
     {
-        socket = CreateSocket("0.0.0.0", port & 0xffff, 4);
-    }
+        int socket = CreateSocket("0.0.0.0", port & 0xffff, 4);
+        sceKernelDelayThread(5 * 1000);
 
-    if (socket >= 0) 
-    {
-        running = 1;
-    }
-
-    while(running)
-    {
-        int client = AcceptClient(&socket, 0);
-
-        if (client < 0) 
+        while(socket >= 0)
         {
-            if (!(socket >= 0))
+            int client = AcceptClient(&socket, 0);
+
+            if (client < 0) 
             {
-                LOG("Error in accept - shutting down server\n");
-                sceNetSocketClose(socket);
-                return 0;
+                if (!(socket >= 0))
+                {
+                    LOG("Error in accept - shutting down server\n");
+                    Shutdown(&socket);
+                    break;
+                }
+                sceKernelDelayThread(5 * 1000);
+                continue;
             }
-            sceKernelDelayThread(5 * 1000);
-            continue;
+            else {
+                //LOG("accepted connection to client\n");
+            }
+
+            struct Client client_sock = {};
+            client_sock.client_socket = client;
+
+            SceUID clientThreadId = createThread("RemoteServerClientThread", &sClientThreadInit, sizeof(client_sock), &client_sock);
+
+            int threadStatus;
+            SceUInt timeout = (SceUInt)-1;
+            sceKernelWaitThreadEnd(clientThreadId, &threadStatus, &timeout);
+
+            sceKernelDeleteThread(clientThreadId);
         }
-        else {
-            //LOG("accepted connection to client\n");
-        }
-
-        struct Client client_sock = {};
-        client_sock.client_socket = client;
-
-        SceUID clientThreadId = createThread("RemoteServerClientThread", &sClientThreadInit, sizeof(client_sock), &client_sock);
-
-        int threadStatus;
-        SceUInt timeout = (SceUInt)-1;
-        sceKernelWaitThreadEnd(clientThreadId, &threadStatus, &timeout);
-
-        sceKernelDeleteThread(clientThreadId);
     }
 
     return 0;
@@ -392,30 +392,32 @@ static int sThreadInit(SceSize args, void *init)
 static int sMulticastInit(SceSize args, void *init)
 {
   int multicast_socket = -1;
-  int sock_running = 0;
+  g_multicastthread_running = 1;
 
-  do {
+  while (g_multicastthread_running) {
     multicast_socket = CreateMulticastSocket(0xEFFFFFFA, 1900);
 
     sceKernelDelayThread(5 * 1000);
 
-  } while(multicast_socket < 0);
+    while(multicast_socket >= 0)
+    {
+        SceNetSockaddrIn in_addr = {};
+        in_addr.sin_family = SCE_NET_AF_INET;
+        in_addr.sin_port = sceNetHtons(1900);
+        in_addr.sin_addr.s_addr = sceNetHtonl(0xEFFFFFFA);
 
-  if (multicast_socket >= 0) 
-  {
-    sock_running = 1;
-  }
+        uint8_t str[] = "Hello World";
+        int res = sceNetSendto(multicast_socket, str, 11, 0, (const SceNetSockaddr *)&in_addr, sizeof(in_addr));
+        if (res < 0) {
+            LOG("multicast thread error: %s\n", sce_net_error_string((SceNetErrorCode)res));
 
-  while(sock_running)
-  {
-    SceNetSockaddrIn in_addr = {};
-    in_addr.sin_family = SCE_NET_AF_INET;
-    in_addr.sin_port = sceNetHtons(1900);
-    in_addr.sin_addr.s_addr = sceNetHtonl(0xEFFFFFFA);
-
-    uint8_t str[] = "Hello World";
-    sceNetSendto(multicast_socket, str, 11, 0, (const SceNetSockaddr *)&in_addr, sizeof(in_addr));
-    sceKernelDelayThread(500 * 1000);
+            if (((SceNetErrorCode)res) == SCE_NET_ERROR_ERETURN) {
+                Shutdown(&multicast_socket);
+                break;
+            }
+        }
+        sceKernelDelayThread(500 * 1000);
+    }
   }
 
   return 0;
@@ -433,5 +435,16 @@ int module_start(SceSize args, void *argp) {
 
 int module_stop(SceSize args, void *argp) {
     LOG("end vitahook\n");
+
+    g_multicastthread_running = 0;
+    g_serverthread_running = 0;
+    int threadStatus;
+    SceUInt timeout = (SceUInt)-1;
+    sceKernelWaitThreadEnd(multicastThreadId, &threadStatus, &timeout);
+    sceKernelDeleteThread(multicastThreadId);
+
+    sceKernelWaitThreadEnd(threadId, &threadStatus, &timeout);
+    sceKernelDeleteThread(threadId);
+
     return SCE_KERNEL_STOP_SUCCESS;
 }

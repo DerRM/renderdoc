@@ -1,6 +1,5 @@
 
 #include <stdio.h>
-#include <psp2/net/net.h>
 #include <psp2/kernel/threadmgr.h>
 
 #include "logging.h"
@@ -11,8 +10,9 @@ extern "C" {
 #endif
 
 uint32_t timeoutMS = 5000;
+static char message[64] = { 0 };
 
-static const char* sce_net_error_string(int err)
+const char* sce_net_error_string(SceNetErrorCode err)
 {
   switch(err)
   {
@@ -31,10 +31,13 @@ static const char* sce_net_error_string(int err)
     case SCE_NET_ERROR_ECONNREFUSED: return "SCE_NET_ERROR_ECONNREFUSED: A connection was refused.";
     case SCE_NET_ERROR_EHOSTDOWN: return "SCE_NET_ERROR_EHOSTDOWN: Host is down.";
     case SCE_NET_ERROR_EHOSTUNREACH: return "SCE_NET_ERROR_EHOSTUNREACH: No route to host.";
-    default: break;
+    default: {
+      sceClibSnprintf(message, 64, "0x%x" PRIu32, (uint32_t)err);
+      return message;
+    }
   }
 
-  return "Unknown error";
+  //return "Unknown error";
 }
 
 void Shutdown(int* socket)
@@ -61,7 +64,7 @@ int AcceptClient(int* socket, uint32_t timeoutMilliseconds)
               && (unsigned int)(res) != SCE_NET_ERROR_EAGAIN 
               && (unsigned int)(res) != SCE_NET_ERROR_EINTR)
           {
-              LOG("accept: %s\n", sce_net_error_string(res));
+              LOG("accept: %s\n", sce_net_error_string((SceNetErrorCode)res));
               Shutdown(socket);
           } 
         }
@@ -172,7 +175,7 @@ int SendDataBlocking(int* socket, const void *buf, uint32_t length)
       }
       else
       {
-        LOG("send: %s\n", sce_net_error_string(ret));
+        LOG("send: %s\n", sce_net_error_string((SceNetErrorCode)ret));
         Shutdown(socket);
         return 0;
       }
@@ -212,7 +215,7 @@ bool IsRecvDataWaiting(int* socket)
     }
     else
     {
-      LOG("recv: %s\n", sce_net_error_string(ret));
+      LOG("recv: %s\n", sce_net_error_string((SceNetErrorCode)ret));
       Shutdown(socket);
       return false;
     }
@@ -265,7 +268,7 @@ int RecvDataBlocking(int* socket, void *buf, uint32_t length)
       }
       else
       {
-        LOG("recv: %s\n", sce_net_error_string(ret));
+        LOG("recv: %s\n", sce_net_error_string((SceNetErrorCode)ret));
         Shutdown(socket);
         return 0;
       }
@@ -308,7 +311,7 @@ int RecvDataNonBlocking(int* socket, void *buf, uint32_t length)
       return 1;
     }
     else {
-      LOG("recv: %s : %" PRIu32 "\n", sce_net_error_string(ret), (uint32_t)ret);
+      LOG("recv: %s : %" PRIu32 "\n", sce_net_error_string((SceNetErrorCode)ret), (uint32_t)ret);
       Shutdown(socket);
       return 0;
     }

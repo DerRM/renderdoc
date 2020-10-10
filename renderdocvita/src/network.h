@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <stdbool.h>
+#include <psp2/net/net.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,6 +21,8 @@ int CreateMulticastSocket(uint32_t bindaddr, uint16_t port);
 int CreateLoopbackSocket(uint16_t port, int listen);
 void Shutdown(int* socket);
 bool IsRecvDataWaiting(int* socket);
+
+const char* sce_net_error_string(SceNetErrorCode err);
 
 #ifdef __cplusplus
 }
