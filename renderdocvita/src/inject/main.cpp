@@ -18,6 +18,12 @@ extern "C" {
 
 #include "../../../renderdoc/driver/gxm/gxm_types.h"
 
+struct ProgramHeader {
+    uint8_t magic[4];
+    uint32_t version;
+    uint32_t length;
+};
+
 struct FileHeader {
     uint64_t magic;
     uint32_t version;
@@ -65,6 +71,7 @@ int g_capture = 0;
 int g_log = 0;
 int g_log_display = 0;
 SceUID g_fd = -1;
+SceUID g_resource_fd = -1;
 
 uint64_t g_fileoffset = 0;
 void* g_framebuffers[64] = {};
@@ -1896,10 +1903,28 @@ CREATE_PATCHED_CALL(unsigned int, sceGxmShaderPatcherGetVertexUsseMemAllocated, 
     return TAI_NEXT(sceGxmShaderPatcherGetVertexUsseMemAllocated, sceGxmShaderPatcherGetVertexUsseMemAllocatedRef, shaderPatcher);
 }
 
+static uint32_t shadercount = 0;
+
 CREATE_PATCHED_CALL(int, sceGxmShaderPatcherRegisterProgram, SceGxmShaderPatcher *shaderPatcher, const SceGxmProgram *programHeader, SceGxmShaderPatcherId *programId)
 {
+    int res = TAI_NEXT(sceGxmShaderPatcherRegisterProgram, sceGxmShaderPatcherRegisterProgramRef, shaderPatcher, programHeader, programId);
+
+    if (programHeader) {
+        ++shadercount;
+        ProgramHeader* header = (ProgramHeader*)programHeader;
+
+        LOG("program #%" PRIu32" header: magic: %s, version: %" PRIu32 ", byte length: %" PRIu32 ", padded length: %" PRIu32 ", id_size: %" PRIu32 ", id: %" PRIu32 "\n", shadercount, header->magic, header->version, header->length, header->length + (4 - (header->length % 4)), sizeof(SceGxmShaderPatcherId), *programId);
+
+        kuIoOpen("ux0:/data/renderdoc/resources.bin", SCE_O_WRONLY | SCE_O_APPEND, &g_resource_fd);
+        kuIoWrite(g_resource_fd, programId, sizeof(SceGxmShaderPatcherId));
+        kuIoWrite(g_resource_fd, &header->length, sizeof(uint32_t));
+        kuIoWrite(g_resource_fd, programHeader, header->length + (4 - (header->length % 4)));
+        kuIoClose(g_resource_fd);
+        g_resource_fd = -1;
+    }
+
     LOGD("sceGxmShaderPatcherRegisterProgram(shaderPatcher: %p, programHeader: %p, programId: %p)\n", shaderPatcher, programHeader, programId);
-    return TAI_NEXT(sceGxmShaderPatcherRegisterProgram, sceGxmShaderPatcherRegisterProgramRef, shaderPatcher, programHeader, programId);
+    return res;
 }
 
 CREATE_PATCHED_CALL(int, sceGxmShaderPatcherReleaseFragmentProgram, SceGxmShaderPatcher *shaderPatcher, SceGxmFragmentProgram *fragmentProgram)
@@ -2923,7 +2948,13 @@ int module_start(SceSize args, void *argp) {
 
 	sceAppMgrAppParamGetString(0, 12, g_titleid , 256);
 
+
     kuIoMkdir("ux0:/data/renderdoc");
+    kuIoRemove("ux0:/data/renderdoc/resources.bin");
+    kuIoOpen("ux0:/data/renderdoc/resources.bin", SCE_O_RDWR | SCE_O_CREAT, &g_resource_fd);
+    kuIoWrite(g_resource_fd, 0, 0);
+    kuIoClose(g_resource_fd);
+    g_resource_fd = -1;
 
     //sceDisplayWaitVblankStartHook = taiHookFunctionImport(&sceDisplayWaitVblankStartRef, TAI_MAIN_MODULE, 0x5ED8F994, 0x05F27764, sceDisplayWaitVblankStartPatched);
     //if (sceDisplayWaitVblankStartHook < 0) LOG("Could not hook sceDisplayWaitVblankStart\n"); else LOG("hooked sceDisplayWaitVblankStart\n");
