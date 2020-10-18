@@ -165,6 +165,7 @@
     <ClCompile Include="gxm_common.cpp" />
     <ClCompile Include="gxm_driver.cpp" />
     <ClCompile Include="gxm_replay.cpp" />
+    <ClCompile Include="gxm_types.cpp" />
     <ClCompile Include="gxm_win32.cpp" />
     <ClCompile Include="precompiled.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Create</PrecompiledHeader>

@@ -70,5 +70,8 @@
     <ClCompile Include="gxm_win32.cpp">
       <Filter>OS\Win32</Filter>
     </ClCompile>
+    <ClCompile Include="gxm_types.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

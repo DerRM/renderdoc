@@ -19,10 +19,16 @@ add_executable(gxm_inject
     ${CMAKE_CURRENT_LIST_DIR}/src/inject/main.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/inject/util.cpp
     #${CMAKE_CURRENT_LIST_DIR}/src/inject/image_write.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/inject/file_manager.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/network.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/serializer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../renderdoc/driver/gxm/gxm_types.cpp
 )
 
+target_include_directories(gxm_inject
+  PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/../renderdoc
+)
 
 add_executable(vitahook_kernel
   src/kernel/main.c

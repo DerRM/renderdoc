@@ -1,5 +1,8 @@
 #pragma once
 
+#include <inttypes.h>
+#include <driver/gxm/official/gxm.h>
+
 enum class GXMChunk : uint32_t
 {
   DeviceInitialisation = 1000,
@@ -275,3 +278,25 @@ enum class GXMChunk : uint32_t
   sceGxmWaitEvent,
   Max,
 };
+
+enum class GXMType : uint32_t {
+  SceGxmTexture,
+  SceGxmShaderPatcherId,
+  SceGxmProgram,
+  SceGxmVertexProgram,
+  SceGxmFragmentProgram
+};
+
+
+extern "C" {
+const char *textureBaseFormat2str(SceGxmTextureFormat format);
+const char *textureSwizzle4Mode2str(SceGxmTextureFormat format);
+const char *textureSwizzle3Mode2str(SceGxmTextureFormat format);
+const char *textureSwizzle2Mode2str(SceGxmTextureFormat format);
+const char *textureSwizzle2AltMode2str(SceGxmTextureFormat format);
+const char *textureSwizzle1Mode2str(SceGxmTextureFormat format);
+const char *textureSwizzleYUV422Mode2str(SceGxmTextureFormat format);
+const char *textureSwizzleYUV420Mode2str(SceGxmTextureFormat format);
+const char *textureSwizzleMode2str(SceGxmTextureFormat format);
+const char* textureFormat2str(SceGxmTextureFormat format);
+}
