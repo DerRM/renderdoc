@@ -19,6 +19,7 @@ class File {
 public:
     File() {}
     void open(const char* path);
+    void reopen();
 
     template<typename T>
     uint32_t read(T& data);

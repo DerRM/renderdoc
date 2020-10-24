@@ -4,6 +4,10 @@
 
 void File::open(const char* path) {
     m_path = path;
+    reopen();
+}
+
+void File::reopen() {
     if (kuIoOpen(m_path, SCE_O_RDWR | SCE_O_APPEND, &m_fd) < 0) {
         LOG("could not open file: %s\n", m_path);
     }

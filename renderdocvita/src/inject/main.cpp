@@ -93,6 +93,8 @@ uint32_t g_frameCount = 0;
 uint32_t g_logFrameCount = 0;
 uint32_t g_displayWaitCount = 0;
 
+const SceGxmVertexProgram * g_activeVertexProgram = NULL;
+
 #define PRINT_LOG
 
 #undef LOGD
@@ -934,6 +936,15 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
         LOG("sceGxmDraw(context: %p, primType: %" PRIu32 ", indexType: %" PRIu32 ", indexData: %p, indexCount: %" PRIu32 ")\n", context, primType, indexType, indexData, indexCount);
     }
 
+    VertexProgramResource vertexRes;
+    g_resource_manager.find(GXMType::SceGxmVertexProgram, (uint32_t)g_activeVertexProgram, &vertexRes);
+
+    LOG("sceGxmDraw, active vertex program: attribute count %" PRIu32 "\n", vertexRes.attributeCount);
+    for (uint32_t attribute_index = 0; attribute_index < vertexRes.attributeCount; ++attribute_index) {
+        SceGxmVertexAttribute& attribute = vertexRes.attributes[attribute_index];
+        LOG("\tattribute: stream index: %" PRIu16 ", offset: %" PRIu16 ", format %s, componentCount: %" PRIu8 ", regIndex: %" PRIu16 "\n", attribute.streamIndex, attribute.offset, attributeFormat2str(attribute.format), attribute.componentCount, attribute.regIndex);
+    }
+
     return TAI_NEXT(sceGxmDraw, sceGxmDrawRef, context, primType, indexType, indexData, indexCount);
 }
 
@@ -1678,8 +1689,8 @@ CREATE_PATCHED_CALL(int, sceGxmSetFragmentTexture, SceGxmContext *context, unsig
     uint32_t width = TAI_NEXT(sceGxmTextureGetWidth, sceGxmTextureGetWidthRef, texture);
     uint32_t height = TAI_NEXT(sceGxmTextureGetHeight, sceGxmTextureGetHeightRef, texture);
 
-    LOG("sceGxmSetFragmentTexture(context: %p, textureIndex: %" PRIu32 ", texture: %p)\n", context, textureIndex, texture);
-    LOG("\tuse texture: data: %p, textureBaseFormat: %s, textureSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 "\n", data, textureBaseFormat2str(format), textureSwizzleMode2str(format), width, height);
+    LOGD("sceGxmSetFragmentTexture(context: %p, textureIndex: %" PRIu32 ", texture: %p)\n", context, textureIndex, texture);
+    LOGD("\tuse texture: data: %p, textureBaseFormat: %s, textureSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 "\n", data, textureBaseFormat2str(format), textureSwizzleMode2str(format), width, height);
     return TAI_NEXT(sceGxmSetFragmentTexture, sceGxmSetFragmentTextureRef, context, textureIndex, texture);
 }
 
@@ -1885,8 +1896,10 @@ CREATE_PATCHED_CALL(void, sceGxmSetVertexProgram, SceGxmContext *context, const 
         kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
         kuIoWrite(g_fd, &vertexProgram, sizeof(SceGxmVertexProgram *));
         g_fileoffset += 16;
-        LOG("sceGxmSetVertexProgram(context: %p, vertexProgram: %p)\n", context, vertexProgram);
+        LOGD("sceGxmSetVertexProgram(context: %p, vertexProgram: %p)\n", context, vertexProgram);
     }
+
+    g_activeVertexProgram = vertexProgram;
 
     TAI_NEXT(sceGxmSetVertexProgram, sceGxmSetVertexProgramRef, context, vertexProgram);
 }
@@ -1903,15 +1916,15 @@ CREATE_PATCHED_CALL(int, sceGxmSetVertexStream, SceGxmContext *context, unsigned
         kuIoWrite(g_fd, &streamIndex, sizeof(uint32_t));
         kuIoWrite(g_fd, &streamData, sizeof(void *));
         g_fileoffset += 20;
-        LOG("sceGxmSetVertexStream(context: %p, streamIndex: %" PRIu32 ", streamData: %p)\n", context, streamIndex, streamData);
     }
+    LOGD("sceGxmSetVertexStream(context: %p, streamIndex: %" PRIu32 ", streamData: %p)\n", context, streamIndex, streamData);
 
     return TAI_NEXT(sceGxmSetVertexStream, sceGxmSetVertexStreamRef, context, streamIndex, streamData);
 }
 
 CREATE_PATCHED_CALL(int, sceGxmSetVertexTexture, SceGxmContext *context, unsigned int textureIndex, const SceGxmTexture *texture)
 {
-    LOG("sceGxmSetVertexTexture(context: %p, textureIndex: %" PRIu32 ", texture: %p)\n", context, textureIndex, texture);
+    LOGD("sceGxmSetVertexTexture(context: %p, textureIndex: %" PRIu32 ", texture: %p)\n", context, textureIndex, texture);
     return TAI_NEXT(sceGxmSetVertexTexture, sceGxmSetVertexTextureRef, context, textureIndex, texture);
 }
 
@@ -1996,16 +2009,28 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherCreateFragmentProgram, SceGxmShaderP
     if (fragmentProgram) {
         GXMType type = GXMType::SceGxmFragmentProgram;
 
-        File file;
-        file.open("ux0:/data/renderdoc/resources.bin");
-        file.write(type);
-        file.write(*fragmentProgram);
-        file.write(programId);
-        file.write(outputFormat);
-        file.write(multisampleMode);
-        file.write(*blendInfo);
-        file.write(vertexProgram);
-        file.close();
+        FragmentProgramResource fragmentProg;
+        fragmentProg.type = type;
+        fragmentProg.id = (uint32_t)*fragmentProgram;
+        
+        fragmentProg.fragmentProgram = *fragmentProgram;
+        fragmentProg.size += sizeof(*fragmentProgram);
+        fragmentProg.programId = programId;
+        fragmentProg.size += sizeof(programId);
+        fragmentProg.outputFormat = outputFormat;
+        fragmentProg.size += sizeof(outputFormat);
+        fragmentProg.multisampleMode = multisampleMode;
+        fragmentProg.size += sizeof(multisampleMode);
+        fragmentProg.vertexProgram = vertexProgram;
+        fragmentProg.size += sizeof(vertexProgram);
+        if (blendInfo) {
+            fragmentProg.hasBlendInfo = 1;
+            fragmentProg.blendInfo = *blendInfo;
+            fragmentProg.size += sizeof(*blendInfo);
+        }
+        fragmentProg.size += sizeof(uint32_t); // for hasBlendInfo
+
+        g_resource_manager.add(&fragmentProg);
     }
     LOGD("sceGxmShaderPatcherCreateFragmentProgram(shaderPatcher: %p, programId: %p, outputFormat: %" PRIu32 ", multisampleMode: %" PRIu32 ", blendInfo: %p, vertexProgram: %p, fragmentProgram: %p)\n", shaderPatcher, programId, outputFormat, multisampleMode, blendInfo, vertexProgram, fragmentProgram);
     return res;
@@ -2024,20 +2049,24 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherCreateVertexProgram, SceGxmShaderPat
     if (vertexProgram) {
         GXMType type = GXMType::SceGxmVertexProgram;
         
-        File file;
-        file.open("ux0:/data/renderdoc/resources.bin");
-        file.write(type);
-        file.write(*vertexProgram);
-        file.write(programId);
-        file.write(attributeCount);
-        for (unsigned int attribute_index = 0; attribute_index < attributeCount; ++attribute_index) {
-            file.write(attributes[attribute_index]);
-        }
-        file.write(streamCount);
-        for (unsigned int stream_index = 0; stream_index < streamCount; ++stream_index) {
-            file.write(streams[stream_index]);
-        }
-        file.close();
+        VertexProgramResource vertexProg;
+        vertexProg.type = type;
+        vertexProg.id = (uint32_t)*vertexProgram;
+        
+        vertexProg.vertexProgram = *vertexProgram;
+        vertexProg.size += sizeof(*vertexProgram);
+        vertexProg.programId = programId;
+        vertexProg.size += sizeof(programId);
+        vertexProg.attributeCount = attributeCount;
+        vertexProg.size += sizeof(attributeCount);
+        memcpy(vertexProg.attributes, attributes, sizeof(SceGxmVertexAttribute) * attributeCount);
+        vertexProg.size += sizeof(SceGxmVertexAttribute) * attributeCount;
+        vertexProg.streamCount = streamCount;
+        vertexProg.size += sizeof(streamCount);
+        memcpy(vertexProg.streams, streams, sizeof(SceGxmVertexStream) * streamCount);
+        vertexProg.size += sizeof(SceGxmVertexStream) * streamCount;
+        
+        g_resource_manager.add(&vertexProg);
     }
 
     LOGD("sceGxmShaderPatcherCreateVertexProgram(shaderPatcher: %p, programId: %p, attributes: %p, attributeCount: %" PRIu32 ", streams: %p, streamCount: %" PRIu32 ", vertexProgram: %p)\n", shaderPatcher, programId, attributes, attributeCount, streams, streamCount, vertexProgram);
@@ -2113,17 +2142,22 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherRegisterProgram, SceGxmShaderPatcher
     if (programHeader) {
         ++shadercount;
         ProgramHeader* header = (ProgramHeader*)programHeader;
-        GXMType type = GXMType::SceGxmShaderPatcherId;
+        GXMType type = GXMType::SceGxmProgram;
 
         LOGD("program #%" PRIu32" header: magic: %s, version: %" PRIu32 ", byte length: %" PRIu32 ", padded length: %" PRIu32 ", id_size: %" PRIu32 ", id: %" PRIu32 "\n", shadercount, header->magic, header->version, header->length, header->length + (4 - (header->length % 4)), sizeof(SceGxmShaderPatcherId), *programId);
 
-        File file;
-        file.open("ux0:/data/renderdoc/resources.bin");
-        file.write(type);
-        file.write(*programId);
-        file.write(header->length);
-        file.write(programHeader, header->length + (4 - (header->length % 4)));
-        file.close();
+        ProgramResource programRes;
+        programRes.type = type;
+        programRes.id = (uint32_t)*programId;
+
+        programRes.programId = *programId;
+        programRes.size += sizeof(*programId);
+        programRes.programLength = header->length + (4 - (header->length % 4));
+        programRes.size += sizeof(uint32_t);
+        programRes.program = programHeader;
+        programRes.size += programRes.programLength;
+
+        g_resource_manager.add(&programRes);
     }
 
     LOGD("sceGxmShaderPatcherRegisterProgram(shaderPatcher: %p, programHeader: %p, programId: %p)\n", shaderPatcher, programHeader, programId);
@@ -2180,51 +2214,51 @@ CREATE_PATCHED_CALL(int, sceGxmTerminate)
 
 CREATE_PATCHED_CALL(int, sceGxmTextureInitCube, SceGxmTexture *texture, const void *data, SceGxmTextureFormat texFormat, unsigned int width, unsigned int height, unsigned int mipCount)
 {
-    LOG("sceGxmTextureInitCube(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", mipCount: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, mipCount);
+    LOGD("sceGxmTextureInitCube(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", mipCount: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, mipCount);
     return TAI_NEXT(sceGxmTextureInitCube, sceGxmTextureInitCubeRef, texture, data, texFormat, width, height, mipCount);
 }
 
 int sceGxmTextureInitCubeArbitrary(SceGxmTexture *texture, const void *data, SceGxmTextureFormat texFormat, unsigned int width, unsigned int height, unsigned int mipCount);
 CREATE_PATCHED_CALL(int, sceGxmTextureInitCubeArbitrary, SceGxmTexture *texture, const void *data, SceGxmTextureFormat texFormat, unsigned int width, unsigned int height, unsigned int mipCount)
 {
-    LOG("sceGxmTextureInitCubeArbitrary(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", mipCount: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, mipCount);
+    LOGD("sceGxmTextureInitCubeArbitrary(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", mipCount: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, mipCount);
     return TAI_NEXT(sceGxmTextureInitCubeArbitrary, sceGxmTextureInitCubeArbitraryRef, texture, data, texFormat, width, height, mipCount);
 }
 
 CREATE_PATCHED_CALL(int, sceGxmTextureInitLinear, SceGxmTexture *texture, const void *data, SceGxmTextureFormat texFormat, unsigned int width, unsigned int height, unsigned int mipCount)
 {
-    LOG("sceGxmTextureInitLinear(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", mipCount: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, mipCount);
+    LOGD("sceGxmTextureInitLinear(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", mipCount: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, mipCount);
     return TAI_NEXT(sceGxmTextureInitLinear, sceGxmTextureInitLinearRef, texture, data, texFormat, width, height, mipCount);
 }
 
 CREATE_PATCHED_CALL(int, sceGxmTextureInitLinearStrided, SceGxmTexture *texture, const void *data, SceGxmTextureFormat texFormat, unsigned int width, unsigned int height, unsigned int byteStride)
 {
-    LOG("sceGxmTextureInitLinearStrided(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", byteStride: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, byteStride);
+    LOGD("sceGxmTextureInitLinearStrided(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", byteStride: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, byteStride);
     return TAI_NEXT(sceGxmTextureInitLinearStrided, sceGxmTextureInitLinearStridedRef, texture, data, texFormat, width, height, byteStride);
 }
 
 CREATE_PATCHED_CALL(int, sceGxmTextureInitSwizzled, SceGxmTexture *texture, const void *data, SceGxmTextureFormat texFormat, unsigned int width, unsigned int height, unsigned int mipCount)
 {
-    LOG("sceGxmTextureInitSwizzled(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", mipCount: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, mipCount);
+    LOGD("sceGxmTextureInitSwizzled(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", mipCount: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, mipCount);
     return TAI_NEXT(sceGxmTextureInitSwizzled, sceGxmTextureInitSwizzledRef, texture, data, texFormat, width, height, mipCount);
 }
 
 int sceGxmTextureInitSwizzledArbitrary(SceGxmTexture *texture, const void *data, SceGxmTextureFormat texFormat, unsigned int width, unsigned int height, unsigned int mipCount);
 CREATE_PATCHED_CALL(int, sceGxmTextureInitSwizzledArbitrary, SceGxmTexture *texture, const void *data, SceGxmTextureFormat texFormat, unsigned int width, unsigned int height, unsigned int mipCount)
 {
-    LOG("sceGxmTextureInitSwizzledArbitrary(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", mipCount: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, mipCount);
+    LOGD("sceGxmTextureInitSwizzledArbitrary(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", mipCount: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, mipCount);
     return TAI_NEXT(sceGxmTextureInitSwizzledArbitrary, sceGxmTextureInitSwizzledArbitraryRef, texture, data, texFormat, width, height, mipCount);
 }
 
 CREATE_PATCHED_CALL(int, sceGxmTextureInitTiled, SceGxmTexture *texture, const void *data, SceGxmTextureFormat texFormat, unsigned int width, unsigned int height, unsigned int mipCount)
 {
-    LOG("sceGxmTextureInitTiled(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", mipCount: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, mipCount);
+    LOGD("sceGxmTextureInitTiled(texture: %p, data: %p, texBaseFormat: %s, texSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 ", mipCount: %" PRIu32 ")\n", texture, data, textureBaseFormat2str(texFormat), textureSwizzleMode2str(texFormat), width, height, mipCount);
     return TAI_NEXT(sceGxmTextureInitTiled, sceGxmTextureInitTiledRef, texture, data, texFormat, width, height, mipCount);
 }
 
 CREATE_PATCHED_CALL(int, sceGxmTextureSetData, SceGxmTexture *texture, const void *data)
 {
-    LOG("sceGxmTextureSetData(texture: %p, data: %p)\n", texture, data);
+    LOGD("sceGxmTextureSetData(texture: %p, data: %p)\n", texture, data);
     return TAI_NEXT(sceGxmTextureSetData, sceGxmTextureSetDataRef, texture, data);
 }
 
