@@ -1,5 +1,8 @@
 
 #include "file_manager.h"
+#include "resource_manager.h"
+
+ResourceManager g_resource_manager;
 
 #ifdef __cplusplus
 extern "C" {
@@ -3038,6 +3041,11 @@ int module_start(SceSize args, void *argp) {
     kuIoClose(g_resource_fd);
     g_resource_fd = -1;
 
+    File file;
+    file.open("ux0:/data/renderdoc/resources.bin");
+    g_resource_manager.init(file);
+
+    /*
     kuIoRemove("ux0:/data/renderdoc/test");
     SceUID test_fd;
     kuIoOpen("ux0:/data/renderdoc/test", SCE_O_RDWR | SCE_O_CREAT, &test_fd);
@@ -3045,7 +3053,6 @@ int module_start(SceSize args, void *argp) {
     kuIoClose(test_fd);
     test_fd = -1;
 
-    /*
     File file;
     file.open("ux0:/data/renderdoc/test");
 
@@ -3064,7 +3071,8 @@ int module_start(SceSize args, void *argp) {
     file.write(header);
     file.close();
 
-    file.removeData(sizeof(ProgramHeader), sizeof(ProgramHeader));
+    header.magic[1] = 'o';
+    file.replaceData(sizeof(ProgramHeader), sizeof(ProgramHeader), &header, sizeof(ProgramHeader));
     file.close();
 
     uint32_t test = 0;

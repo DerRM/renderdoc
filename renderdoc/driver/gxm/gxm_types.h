@@ -284,7 +284,8 @@ enum class GXMType : uint32_t {
   SceGxmShaderPatcherId,
   SceGxmProgram,
   SceGxmVertexProgram,
-  SceGxmFragmentProgram
+  SceGxmFragmentProgram,
+  SceGXMUnknown
 };
 
 

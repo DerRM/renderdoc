@@ -20,6 +20,7 @@ add_executable(gxm_inject
     ${CMAKE_CURRENT_LIST_DIR}/src/inject/util.cpp
     #${CMAKE_CURRENT_LIST_DIR}/src/inject/image_write.c
     ${CMAKE_CURRENT_LIST_DIR}/src/inject/file_manager.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/inject/resource_manager.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/network.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/serializer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../renderdoc/driver/gxm/gxm_types.cpp
