@@ -102,6 +102,7 @@ public:
     void add(Resource* resource);
     void remove(Resource* resource);
     bool contains(uint32_t key);
+    void deinit();
 private:
     File m_file;
     uint32_t getFilePos(Resource* resource);

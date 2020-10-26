@@ -7,9 +7,14 @@ void File::open(const char* path) {
     reopen();
 }
 
+void File::setPath(const char* path) {
+    m_path = path;
+}
+
 void File::reopen() {
-    if (kuIoOpen(m_path, SCE_O_RDWR | SCE_O_APPEND, &m_fd) < 0) {
-        LOG("could not open file: %s\n", m_path);
+    m_fd = sceIoOpen(m_path, SCE_O_RDWR | SCE_O_APPEND | SCE_O_CREAT, 0777);
+    if (m_fd < 0) {
+        LOG("could not open file: %s, error: %" PRIi32 "\n", m_path, m_fd);
     }
 }
 
@@ -20,7 +25,7 @@ uint32_t File::write(const void* data, uint32_t size) {
     }
 
     int bytesWritten = 0;
-    if ((bytesWritten = kuIoWrite(m_fd, data, size)) == 0) {
+    if ((bytesWritten = sceIoWrite(m_fd, data, size)) == 0) {
         LOG("could not write to file: %s\n", m_path);
         return 0;
     }
@@ -35,7 +40,7 @@ uint32_t File::read(void* data, uint32_t size) {
     }
 
     int bytesRead = 0;
-    if ((bytesRead = kuIoRead(m_fd, data, size)) == 0) {
+    if ((bytesRead = sceIoRead(m_fd, data, size)) == 0) {
         LOG("could not write to file: %s\n", m_path);
         return 0;
     }
@@ -46,25 +51,24 @@ uint32_t File::read(void* data, uint32_t size) {
 #define TMP_FILE "ux0:/data/renderdoc/tmp"
 
 void File::removeData(uint32_t file_pos, uint32_t size) {
-    kuIoRemove(TMP_FILE);
-    SceUID m_tmp_fd = -1;
-    if (kuIoOpen(TMP_FILE, SCE_O_RDWR | SCE_O_CREAT, &m_tmp_fd) < 0) {
-        LOG("could not open temporary file\n");
-        return;
-    }
+    sceIoRemove(TMP_FILE);
 
     close();
-    if (kuIoOpen(m_path, SCE_O_RDONLY, &m_fd) < 0) {
+    if ((m_fd = sceIoOpen(m_path, SCE_O_RDONLY, 0777)) < 0) {
         LOG("could not open file for reading\n");
         return;
     }
+    SceUID m_tmp_fd = -1;
+    if ((m_tmp_fd = sceIoOpen(TMP_FILE, SCE_O_WRONLY | SCE_O_CREAT, 0777)) < 0) {
+        LOG("could not open tmp file for reading\n");
+        return;
+    }
 
-    kuIoLseek(m_fd, 0, SCE_SEEK_END);
-    SceOff fileSize = 0;
-    kuIoTell(m_fd, &fileSize);
+    SceOff fileSize = sceIoLseek(m_fd, 0, SCE_SEEK_END);
     LOG("file size: %" PRIi64 "\n", fileSize);
     uint32_t remaining_file_size = (uint32_t)fileSize;
-    kuIoLseek(m_fd, 0, SCE_SEEK_SET);
+    SceOff pos = sceIoLseek(m_fd, 0, SCE_SEEK_SET);
+    LOG("file pos: %" PRIi64 "\n", pos);
 
     uint8_t chunk[CHUNK_SIZE] = { 0 };
     uint32_t offset = 0;
@@ -76,9 +80,9 @@ void File::removeData(uint32_t file_pos, uint32_t size) {
         else
             buffer_size = file_pos - offset;
 
-        int bytes = kuIoRead(m_fd, chunk, buffer_size);
+        int bytes = sceIoRead(m_fd, chunk, buffer_size);
         LOG("bytes read: %" PRIi32 "\n", bytes);
-        bytes = kuIoWrite(m_tmp_fd, chunk, buffer_size);
+        bytes = sceIoWrite(m_tmp_fd, chunk, buffer_size);
         LOG("bytes written: %" PRIi32 "\n", bytes);
 
         offset += buffer_size;
@@ -92,11 +96,11 @@ void File::removeData(uint32_t file_pos, uint32_t size) {
     LOG("file_pos: %" PRIu32 "\n", file_pos);
     LOG("size: %" PRIu32 "\n", size);
 
+    sceIoLseek(m_fd, size, SCE_SEEK_CUR);
+    sceIoRead(m_fd, NULL, size);
 
-    //kuIoLseek(m_fd, file_pos, SCE_SEEK_SET);
-    flush();
-    kuIoLseek(m_fd, size, SCE_SEEK_CUR);
-    flush();
+    pos = sceIoLseek(m_fd, 0, SCE_SEEK_CUR);
+    LOG("file pos: %" PRIi64 "\n", pos);
 
     offset = 0;
     buffer_size = 0;
@@ -107,45 +111,40 @@ void File::removeData(uint32_t file_pos, uint32_t size) {
         else
             buffer_size = remaining_file_size - offset;
 
-        int bytes = kuIoRead(m_fd, chunk, buffer_size);
+        int bytes = sceIoRead(m_fd, chunk, buffer_size);
         LOG("bytes read: %" PRIi32 "\n", bytes);
-        bytes = kuIoWrite(m_tmp_fd, chunk, buffer_size);
+        bytes = sceIoWrite(m_tmp_fd, chunk, buffer_size);
         LOG("bytes written: %" PRIi32 "\n", bytes);
-
 
         offset += buffer_size;
     }
 
-    flush();
+    sceIoClose(m_tmp_fd);
+    sceIoClose(m_fd);
 
-    kuIoClose(m_tmp_fd);
-    kuIoClose(m_fd);
-
-    kuIoRemove(m_path);
-    kuIoRename(TMP_FILE, m_path);
-    kuIoOpen(m_path, SCE_O_RDWR | SCE_O_APPEND, &m_fd);
+    sceIoRemove(m_path);
+    sceIoRename(TMP_FILE, m_path);
+    m_fd = sceIoOpen(m_path, SCE_O_RDWR | SCE_O_APPEND, 0777);
 }
 
 void File::insertData(uint32_t file_pos, void* data, uint32_t size) {
-    kuIoRemove(TMP_FILE);
+    sceIoRemove(TMP_FILE);
+    close();
+    if ((m_fd = sceIoOpen(m_path, SCE_O_RDONLY, 0777)) < 0) {
+        LOG("could not open file for reading\n");
+        return;
+    }
+    
     SceUID m_tmp_fd = -1;
-    if (kuIoOpen(TMP_FILE, SCE_O_RDWR | SCE_O_CREAT, &m_tmp_fd) < 0) {
+    if ((m_tmp_fd = sceIoOpen(TMP_FILE, SCE_O_RDWR | SCE_O_CREAT, 0777)) < 0) {
         LOG("could not open temporary file\n");
         return;
     }
 
-    close();
-    if (kuIoOpen(m_path, SCE_O_RDONLY, &m_fd) < 0) {
-        LOG("could not open file for reading\n");
-        return;
-    }
-
-    kuIoLseek(m_fd, 0, SCE_SEEK_END);
-    SceOff fileSize = 0;
-    kuIoTell(m_fd, &fileSize);
+    SceOff fileSize = sceIoLseek(m_fd, 0, SCE_SEEK_END);
     LOG("file size: %" PRIi64 "\n", fileSize);
     uint32_t remaining_file_size = (uint32_t)fileSize;
-    kuIoLseek(m_fd, 0, SCE_SEEK_SET);
+    sceIoLseek(m_fd, 0, SCE_SEEK_SET);
 
     uint8_t chunk[CHUNK_SIZE] = { 0 };
     uint32_t offset = 0;
@@ -157,12 +156,11 @@ void File::insertData(uint32_t file_pos, void* data, uint32_t size) {
         else
             buffer_size = file_pos - offset;
 
-        int bytes = kuIoRead(m_fd, chunk, buffer_size);
-        bytes = kuIoWrite(m_tmp_fd, chunk, buffer_size);
+        int bytes = sceIoRead(m_fd, chunk, buffer_size);
+        bytes = sceIoWrite(m_tmp_fd, chunk, buffer_size);
 
         offset += buffer_size;
     }
-    flush();
 
     remaining_file_size -= file_pos;
 
@@ -175,12 +173,11 @@ void File::insertData(uint32_t file_pos, void* data, uint32_t size) {
         else
             buffer_size = size - offset;
 
-        int bytes = kuIoWrite(m_tmp_fd, &copy_buffer[offset], buffer_size);
+        int bytes = sceIoWrite(m_tmp_fd, &copy_buffer[offset], buffer_size);
         LOG("bytes written: %" PRIi32 "\n", bytes);
 
         offset += buffer_size;
     }
-    flush();
 
     offset = 0;
     buffer_size = 0;
@@ -191,19 +188,19 @@ void File::insertData(uint32_t file_pos, void* data, uint32_t size) {
         else
             buffer_size = remaining_file_size - offset;
 
-        int bytes = kuIoRead(m_fd, chunk, buffer_size);
-        bytes = kuIoWrite(m_tmp_fd, chunk, buffer_size);
+        int bytes = sceIoRead(m_fd, chunk, buffer_size);
+        bytes = sceIoWrite(m_tmp_fd, chunk, buffer_size);
 
         offset += buffer_size;
     }
     flush();
 
-    kuIoClose(m_tmp_fd);
-    kuIoClose(m_fd);
+    sceIoClose(m_tmp_fd);
+    sceIoClose(m_fd);
 
-    kuIoRemove(m_path);
-    kuIoRename(TMP_FILE, m_path);
-    kuIoOpen(m_path, SCE_O_RDWR | SCE_O_APPEND, &m_fd);
+    sceIoRemove(m_path);
+    sceIoRename(TMP_FILE, m_path);
+    m_fd = sceIoOpen(m_path, SCE_O_RDWR | SCE_O_APPEND, 0777);
 }
 
 void File::replaceData(uint32_t file_pos, uint32_t old_size, void* new_data, uint32_t new_size) {
@@ -212,8 +209,6 @@ void File::replaceData(uint32_t file_pos, uint32_t old_size, void* new_data, uin
 }
 
 void File::flush() {
-    SceOff pos;
-    kuIoTell(m_fd, &pos);
 }
 
 void File::remove() {
@@ -221,16 +216,14 @@ void File::remove() {
 }
 
 void File::skip(uint32_t size) {
-    kuIoLseek(m_fd, size, SCE_SEEK_CUR);
-    flush();
+    sceIoLseek(m_fd, size, SCE_SEEK_CUR);
 }
 
 void File::close() {
-    kuIoClose(m_fd);
+    sceIoClose(m_fd);
     m_fd = -1;
 }
 
 void File::reset() {
-    kuIoLseek(m_fd, 0, SCE_SEEK_SET);
-    flush();
+    sceIoLseek(m_fd, 0, SCE_SEEK_SET);
 }

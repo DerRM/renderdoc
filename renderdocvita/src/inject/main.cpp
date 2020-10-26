@@ -10,7 +10,6 @@ extern "C" {
 
 #include <vitasdk.h>
 #include <taihen.h>
-#include <kuio.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -76,8 +75,7 @@ static char g_titleid[16];
 int g_capture = 0;
 int g_log = 0;
 int g_log_display = 0;
-SceUID g_fd = -1;
-SceUID g_resource_fd = -1;
+File g_file;
 
 uint64_t g_fileoffset = 0;
 void* g_framebuffers[64] = {};
@@ -94,6 +92,7 @@ uint32_t g_logFrameCount = 0;
 uint32_t g_displayWaitCount = 0;
 
 const SceGxmVertexProgram * g_activeVertexProgram = NULL;
+const void * g_activeVertexStreams[SCE_GXM_MAX_VERTEX_STREAMS] = { NULL };
 
 #define PRINT_LOG
 
@@ -107,12 +106,6 @@ if (g_log) \
 #else
 #define LOGD(...)
 #endif
-
-#define FILE_WRITE(offset, fd, val, size) \
-    do { \
-        kuIoWrite(fd, val, size); \
-        offset += size;           \
-    } while(0)
 
 typedef struct sce_module_exports {
   uint16_t size;           // size of this structure; 0x20 for Vita 1.x
@@ -216,8 +209,7 @@ static int sceDisplaySetFrameBufPatched(SceDisplayFrameBuf* frameBuf, SceDisplay
 		sceRtcGetCurrentClockLocalTime(&time);
         char fname[256];
 		sceClibSnprintf(fname, 256, "ux0:/data/renderdoc/%s-%d-%d-%d-%d-%d-%d.bmp", "renderdoc", time.year, time.month, time.day, time.hour, time.minute, time.second);
-		SceUID fd;
-		kuIoOpen(fname, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, &fd);
+		SceUID fd = sceIoOpen(fname, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, 0777);
 		
 		// Writing Bitmap Header
 		memset(sshot_buffer, 0, 0x36);
@@ -229,7 +221,7 @@ static int sceDisplaySetFrameBufPatched(SceDisplayFrameBuf* frameBuf, SceDisplay
 		*((uint32_t*)(&sshot_buffer[0x16])) = frameBuf->height;
 		*((uint32_t*)(&sshot_buffer[0x1A])) = 0x00200001;
 		*((uint32_t*)(&sshot_buffer[0x22])) = ((frameBuf->width * frameBuf->height) << 2);
-		kuIoWrite(fd, sshot_buffer, 0x36);
+		sceIoWrite(fd, sshot_buffer, 0x36);
 		
 		// Writing Bitmap Table
 		uint32_t x, y, i;
@@ -248,14 +240,14 @@ static int sceDisplaySetFrameBufPatched(SceDisplayFrameBuf* frameBuf, SceDisplay
 				i++;
 				if (i == (CHUNK_SIZE >> 2)){
 					i = 0;
-					kuIoWrite(fd, sshot_buffer, CHUNK_SIZE);
+					sceIoWrite(fd, sshot_buffer, CHUNK_SIZE);
 				}
 			}
 		}
-		if (i != 0) kuIoWrite(fd, sshot_buffer, i << 2);
+		if (i != 0) sceIoWrite(fd, sshot_buffer, i << 2);
 		
 		// Saving file
-		kuIoClose(fd);
+		sceIoClose(fd);
 
         g_log_display = 0;
     }
@@ -567,17 +559,16 @@ CREATE_PATCHED_CALL(int, sceGxmBeginScene, SceGxmContext *context, unsigned int 
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmBeginScene;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
-        kuIoWrite(g_fd, &flags, sizeof(uint32_t));
-        kuIoWrite(g_fd, &renderTarget, sizeof(SceGxmRenderTarget *));
-        kuIoWrite(g_fd, &validRegion, sizeof(SceGxmValidRegion *));
-        kuIoWrite(g_fd, &vertexSyncObject, sizeof(SceGxmSyncObject *));
-        kuIoWrite(g_fd, &fragmentSyncObject, sizeof(SceGxmSyncObject *));
-        kuIoWrite(g_fd, &colorSurface, sizeof(SceGxmColorSurface *));
-        kuIoWrite(g_fd, &depthStencil, sizeof(SceGxmDepthStencilSurface *));
-        g_fileoffset += 40;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(context);
+        g_fileoffset += g_file.write(flags);
+        g_fileoffset += g_file.write(renderTarget);
+        g_fileoffset += g_file.write(validRegion);
+        g_fileoffset += g_file.write(vertexSyncObject);
+        g_fileoffset += g_file.write(fragmentSyncObject);
+        g_fileoffset += g_file.write(colorSurface);
+        g_fileoffset += g_file.write(depthStencil);
         LOG("sceGxmBeginScene(context: %p, flags: %d, rendertarget: %p, validRegion: %p, vertexSyncObject: %p, fragmentSyncObject: %p, colorSurface: %p, depthStencil: %p)\n", context, flags, renderTarget, validRegion, vertexSyncObject, fragmentSyncObject, colorSurface, depthStencil);
     }
 
@@ -835,12 +826,11 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmDisplayQueueAddEntry;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &oldBuffer, sizeof(SceGxmSyncObject *));
-        kuIoWrite(g_fd, &newBuffer, sizeof(SceGxmSyncObject *));
-        kuIoWrite(g_fd, &callbackData, sizeof(void *));
-        g_fileoffset += 20;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(oldBuffer);
+        g_fileoffset += g_file.write(newBuffer);
+        g_fileoffset += g_file.write(callbackData);
         LOGD("sceGxmDisplayQueueAddEntry(oldBuffer: %p, newBuffer: %p, callbackData: %p)\n", oldBuffer, newBuffer, callbackData);
     }
 
@@ -851,13 +841,24 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
         g_log_display = 1;
         g_logFrameCount = g_frameCount;
 
-        kuIoLseek(g_fd, sizeof(struct FileHeader) + offsetof(struct BinaryThumbnail, data) + offsetof(struct CaptureMetaData, driverName) + 4 + offsetof(struct BinarySectionHeader, sectionCompressedLength), SCE_SEEK_SET);
+        g_file.close();
 
-        kuIoWrite(g_fd, &g_fileoffset, sizeof(uint64_t));
-        kuIoWrite(g_fd, &g_fileoffset, sizeof(uint64_t));
-        kuIoClose(g_fd);
+        struct test_t {
+            uint64_t file_size;
+            uint64_t file_size_compressed;
+        };
+
+        struct test_t test;
+        test.file_size = g_fileoffset;
+        test.file_size_compressed = g_fileoffset;
+
+        uint32_t offset = sizeof(struct FileHeader) + offsetof(struct BinaryThumbnail, data) + offsetof(struct CaptureMetaData, driverName) + 4 + offsetof(struct BinarySectionHeader, sectionCompressedLength);
+        g_file.replaceData(offset, sizeof(test_t), &test, sizeof(test_t));
+        g_file.close();
+
+        LOG("g_fileoffset: %" PRIu64 "\n", g_fileoffset);
         g_fileoffset = 0;
-        g_fd = -1;
+        //g_fd = -1;
     }
 
     if (g_capture) {
@@ -869,7 +870,7 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
 		sceRtcGetCurrentClockLocalTime(&time);
 		sceClibSnprintf(fname, 256, "ux0:/data/renderdoc/%s_%04d.%02d.%02d_%02d.%02d.rdc", g_titleid, time.year, time.month, time.day, time.hour, time.minute);
 
-        kuIoOpen(fname, SCE_O_WRONLY | SCE_O_CREAT, &g_fd);
+        g_file.open(fname);
 
         struct FileHeader header = {};
         header.magic = 1129268306U;
@@ -889,10 +890,10 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
 
         header.headerLength = sizeof(struct FileHeader) + offsetof(struct BinaryThumbnail, data) + thumbHeader.length +
                               offsetof(struct CaptureMetaData, driverName) + meta.driverNameLength;
-        kuIoWrite(g_fd, &header, sizeof(struct FileHeader));
-        kuIoWrite(g_fd, &thumbHeader, offsetof(struct BinaryThumbnail, data));
-        kuIoWrite(g_fd, &meta, offsetof(struct CaptureMetaData, driverName));
-        kuIoWrite(g_fd, "GXM", meta.driverNameLength);
+        g_file.write(header);
+        g_file.write(&thumbHeader, offsetof(struct BinaryThumbnail, data));
+        g_file.write(&meta, offsetof(struct CaptureMetaData, driverName));
+        g_file.write("GXM", meta.driverNameLength);
 
         struct BinarySectionHeader section;
         section.isASCII = '\0';
@@ -904,8 +905,8 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
         section.sectionFlags = 0;
         section.sectionNameLength = 13;
 
-        kuIoWrite(g_fd, &section, offsetof(struct BinarySectionHeader, name));
-        kuIoWrite(g_fd, "FrameCapture", section.sectionNameLength);
+        g_file.write(&section, offsetof(struct BinarySectionHeader, name));
+        g_file.write("FrameCapture", section.sectionNameLength);
     }
 
     ++g_frameCount;
@@ -925,24 +926,68 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmDraw;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &context, sizeof(context));
-        kuIoWrite(g_fd, &primType, sizeof(SceGxmPrimitiveType));
-        kuIoWrite(g_fd, &indexType, sizeof(SceGxmIndexFormat));
-        kuIoWrite(g_fd, &indexData, sizeof(void*));
-        kuIoWrite(g_fd, &indexCount, sizeof(uint32_t));
-        g_fileoffset += 28;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(context);
+        g_fileoffset += g_file.write(primType);
+        g_fileoffset += g_file.write(indexType);
+        g_fileoffset += g_file.write(indexData);
+        g_fileoffset += g_file.write(indexCount);
+/*
+        kuIoClose(g_fd);
+
+        VertexProgramResource vertexRes;
+        g_resource_manager.find(GXMType::SceGxmVertexProgram, (uint32_t)g_activeVertexProgram, &vertexRes);
+
+        kuIoOpen(fname, SCE_O_WRONLY | SCE_O_APPEND, &g_fd);
+
+        LOG("sceGxmDraw, active vertex program: attribute count %" PRIu32 "\n", vertexRes.attributeCount);
+        for (uint32_t attribute_index = 0; attribute_index < vertexRes.attributeCount; ++attribute_index) {
+            SceGxmVertexAttribute& attribute = vertexRes.attributes[attribute_index];
+            LOG("\tattribute: stream index: %" PRIu16 ", offset: %" PRIu16 ", format %s, componentCount: %" PRIu8 ", regIndex: %" PRIu16 "\n", attribute.streamIndex, attribute.offset, attributeFormat2str(attribute.format), attribute.componentCount, attribute.regIndex);
+        }
+        LOG("sceGxmDraw, streamCount: %" PRIu32 "\n", vertexRes.streamCount);
+        for (uint32_t stream_index = 0; stream_index < vertexRes.streamCount; ++stream_index) {
+            SceGxmVertexStream& stream = vertexRes.streams[stream_index];
+            LOG("\tstream: stride %" PRIu16 ", indexSource: %" PRIu16 "\n", stream.stride, stream.indexSource);
+        }
+
+        uint32_t max_index = 0;
+
+        switch(indexType) {
+            case SCE_GXM_INDEX_FORMAT_U16: {
+                uint16_t* indices = (uint16_t*)indexData;
+                for (uint32_t index = 0; index < indexCount; ++index) {
+                    if (max_index < indices[index]) {
+                        max_index = indices[index];
+                    }
+                }
+            } break;
+            case SCE_GXM_INDEX_FORMAT_U32: {
+                uint32_t* indices = (uint32_t*)indexData;
+                for (uint32_t index = 0; index < indexCount; ++index) {
+                    if (max_index < indices[index]) {
+                        max_index = indices[index];
+                    }
+                }
+            } break;
+            default: break;
+        }
+
+        LOG("sceGxmDraw, max_index: %" PRIu32 "\n", max_index);
+
+        kuIoWrite(g_fd, &vertexRes.streamCount, sizeof(uint32_t));
+        g_fileoffset += 4;
+
+        for (uint32_t stream_index = 0; stream_index < vertexRes.streamCount; ++stream_index) {
+            uint32_t vertexBufferSize = (max_index + 1) * vertexRes.streams[stream_index].stride;
+            kuIoWrite(g_fd, &vertexBufferSize, sizeof(uint32_t));
+            g_fileoffset += sizeof(uint32_t);
+            kuIoWrite(g_fd, g_activeVertexStreams[vertexRes.streams[stream_index].indexSource], vertexBufferSize);
+            g_fileoffset += vertexBufferSize;
+        }
+*/
         LOG("sceGxmDraw(context: %p, primType: %" PRIu32 ", indexType: %" PRIu32 ", indexData: %p, indexCount: %" PRIu32 ")\n", context, primType, indexType, indexData, indexCount);
-    }
-
-    VertexProgramResource vertexRes;
-    g_resource_manager.find(GXMType::SceGxmVertexProgram, (uint32_t)g_activeVertexProgram, &vertexRes);
-
-    LOG("sceGxmDraw, active vertex program: attribute count %" PRIu32 "\n", vertexRes.attributeCount);
-    for (uint32_t attribute_index = 0; attribute_index < vertexRes.attributeCount; ++attribute_index) {
-        SceGxmVertexAttribute& attribute = vertexRes.attributes[attribute_index];
-        LOG("\tattribute: stream index: %" PRIu16 ", offset: %" PRIu16 ", format %s, componentCount: %" PRIu8 ", regIndex: %" PRIu16 "\n", attribute.streamIndex, attribute.offset, attributeFormat2str(attribute.format), attribute.componentCount, attribute.regIndex);
     }
 
     return TAI_NEXT(sceGxmDraw, sceGxmDrawRef, context, primType, indexType, indexData, indexCount);
@@ -973,12 +1018,11 @@ CREATE_PATCHED_CALL(int, sceGxmEndScene, SceGxmContext *context, const SceGxmNot
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmEndScene;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
-        kuIoWrite(g_fd, &vertexNotification, sizeof(SceGxmNotification *));
-        kuIoWrite(g_fd, &fragmentNotification, sizeof(SceGxmNotification *));
-        g_fileoffset += 20;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(context);
+        g_fileoffset += g_file.write(vertexNotification);
+        g_fileoffset += g_file.write(fragmentNotification);
         LOGD("sceGxmEndScene(context: %p, flags: %" PRIu32 ", vertexNotification: %p, fragmentNotification: %p)\n", context, vertexNotification, fragmentNotification);
     }
 
@@ -1163,11 +1207,10 @@ CREATE_PATCHED_CALL(int, sceGxmPadHeartbeat, const SceGxmColorSurface *displaySu
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmPadHeartbeat;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &displaySurface, sizeof(SceGxmColorSurface *));
-        kuIoWrite(g_fd, &displaySyncObject, sizeof(SceGxmSyncObject *));
-        g_fileoffset += 16;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(displaySurface);
+        g_fileoffset += g_file.write(displaySyncObject);
         LOGD("sceGxmPadHeartbeat(displaySurface: %p, displaySyncObject: %p)\n", displaySurface, displaySyncObject);
     }
 
@@ -1518,11 +1561,10 @@ CREATE_PATCHED_CALL(int, sceGxmReserveFragmentDefaultUniformBuffer, SceGxmContex
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmReserveFragmentDefaultUniformBuffer;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
-        kuIoWrite(g_fd, &uniformBuffer, sizeof(void **));
-        g_fileoffset += 16;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(context);
+        g_fileoffset += g_file.write(uniformBuffer);
         LOG("sceGxmReserveFragmentDefaultUniformBuffer(context: %p, uniformBuffer: %p)\n", context, uniformBuffer);
     }
 
@@ -1535,11 +1577,10 @@ CREATE_PATCHED_CALL(int, sceGxmReserveVertexDefaultUniformBuffer, SceGxmContext 
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmReserveVertexDefaultUniformBuffer;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
-        kuIoWrite(g_fd, &uniformBuffer, sizeof(void **));
-        g_fileoffset += 16;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(context);
+        g_fileoffset += g_file.write(uniformBuffer);
         LOG("sceGxmReserveVertexDefaultUniformBuffer(context: %p, uniformBuffer: %p)\n", context, uniformBuffer);
     }
 
@@ -1671,11 +1712,10 @@ CREATE_PATCHED_CALL(void, sceGxmSetFragmentProgram, SceGxmContext *context, cons
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmSetFragmentProgram;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
-        kuIoWrite(g_fd, &fragmentProgram, sizeof(SceGxmFragmentProgram *));
-        g_fileoffset += 16;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(context);
+        g_fileoffset += g_file.write(fragmentProgram);
         LOG("sceGxmSetFragmentProgram(context: %p, fragmentProgram: %p)\n", context, fragmentProgram);
     }
 
@@ -1712,11 +1752,10 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontDepthFunc, SceGxmContext *context, SceGx
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmSetFrontDepthFunc;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
-        kuIoWrite(g_fd, &depthFunc, sizeof(SceGxmDepthFunc));
-        g_fileoffset += 16;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(context);
+        g_fileoffset += g_file.write(depthFunc);
         LOG("sceGxmSetFrontDepthFunc(context: %p, depthFunc: %" PRIu32 ")\n", context, depthFunc);
     }
 
@@ -1729,11 +1768,10 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontDepthWriteEnable, SceGxmContext *context
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmSetFrontDepthWriteEnable;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
-        kuIoWrite(g_fd, &enable, sizeof(SceGxmDepthWriteMode));
-        g_fileoffset += 16;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(context);
+        g_fileoffset += g_file.write(enable);
         LOG("sceGxmSetFrontDepthWriteEnable(context: %p, enable: %" PRIu32 ")\n", context, enable);
 
     }
@@ -1771,16 +1809,15 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontStencilFunc, SceGxmContext *context, Sce
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmSetFrontStencilFunc;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
-        kuIoWrite(g_fd, &func, sizeof(SceGxmStencilFunc));
-        kuIoWrite(g_fd, &stencilFail, sizeof(SceGxmStencilOp));
-        kuIoWrite(g_fd, &depthFail, sizeof(SceGxmStencilOp));
-        kuIoWrite(g_fd, &depthPass, sizeof(SceGxmStencilOp));
-        kuIoWrite(g_fd, &compareMask, sizeof(uint8_t));
-        kuIoWrite(g_fd, &writeMask, sizeof(uint8_t));
-        g_fileoffset += 21;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(context);
+        g_fileoffset += g_file.write(func);
+        g_fileoffset += g_file.write(stencilFail);
+        g_fileoffset += g_file.write(depthFail);
+        g_fileoffset += g_file.write(depthPass);
+        g_fileoffset += g_file.write(compareMask);
+        g_fileoffset += g_file.write(writeMask);
         LOG("sceGxmSetFrontStencilFunc(context: %p, func: %" PRIu32 ", stencilFail: %" PRIu32 ", depthFail: %" PRIu32 ", depthPass: %" PRIu32 ", compareMask: %" PRIu8 ", writeMask: %" PRIu8 ")\n", context, func, stencilFail, depthFail, depthPass, compareMask, writeMask);
     }
 
@@ -1793,11 +1830,10 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontStencilRef, SceGxmContext *context, unsi
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmSetFrontStencilRef;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
-        kuIoWrite(g_fd, &sref, sizeof(uint32_t));
-        g_fileoffset += 16;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(context);
+        g_fileoffset += g_file.write(sref);
         LOG("sceGxmSetFrontStencilRef(context: %p, sref: %" PRIu32 ")\n", context, sref);
     }
 
@@ -1852,14 +1888,13 @@ CREATE_PATCHED_CALL(int, sceGxmSetUniformDataF, void *uniformBuffer, const SceGx
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmSetUniformDataF;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &uniformBuffer, sizeof(void *));
-        kuIoWrite(g_fd, &parameter, sizeof(SceGxmProgramParameter *));
-        kuIoWrite(g_fd, &componentOffset, sizeof(uint32_t));
-        kuIoWrite(g_fd, &componentCount, sizeof(uint32_t));
-        kuIoWrite(g_fd, &sourceData, sizeof(float *));
-        g_fileoffset += 28;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(uniformBuffer);
+        g_fileoffset += g_file.write(parameter);
+        g_fileoffset += g_file.write(componentOffset);
+        g_fileoffset += g_file.write(componentCount);
+        g_fileoffset += g_file.write(sourceData);
         LOG("sceGxmSetUniformDataF(uniformBuffer, %p, parameter: %p, componentOffset: %" PRIu32 ", componentCount: %" PRIu32 ", sourceData: %p)\n", uniformBuffer, parameter, componentOffset, componentCount, sourceData);
     }
 
@@ -1891,11 +1926,10 @@ CREATE_PATCHED_CALL(void, sceGxmSetVertexProgram, SceGxmContext *context, const 
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmSetVertexProgram;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
-        kuIoWrite(g_fd, &vertexProgram, sizeof(SceGxmVertexProgram *));
-        g_fileoffset += 16;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(context);
+        g_fileoffset += g_file.write(vertexProgram);
         LOGD("sceGxmSetVertexProgram(context: %p, vertexProgram: %p)\n", context, vertexProgram);
     }
 
@@ -1910,14 +1944,15 @@ CREATE_PATCHED_CALL(int, sceGxmSetVertexStream, SceGxmContext *context, unsigned
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmSetVertexStream;
-        kuIoWrite(g_fd, &type, sizeof(GXMChunk));
-        kuIoWrite(g_fd, &chunkSize, sizeof(uint32_t));
-        kuIoWrite(g_fd, &context, sizeof(SceGxmContext *));
-        kuIoWrite(g_fd, &streamIndex, sizeof(uint32_t));
-        kuIoWrite(g_fd, &streamData, sizeof(void *));
-        g_fileoffset += 20;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(context);
+        g_fileoffset += g_file.write(streamIndex);
+        g_fileoffset += g_file.write(streamData);
+        LOGD("sceGxmSetVertexStream(context: %p, streamIndex: %" PRIu32 ", streamData: %p)\n", context, streamIndex, streamData);
     }
-    LOGD("sceGxmSetVertexStream(context: %p, streamIndex: %" PRIu32 ", streamData: %p)\n", context, streamIndex, streamData);
+
+    g_activeVertexStreams[streamIndex] = streamData;
 
     return TAI_NEXT(sceGxmSetVertexStream, sceGxmSetVertexStreamRef, context, streamIndex, streamData);
 }
@@ -3068,12 +3103,12 @@ int module_start(SceSize args, void *argp) {
 	sceAppMgrAppParamGetString(0, 12, g_titleid , 256);
 
 
-    kuIoMkdir("ux0:/data/renderdoc");
-    kuIoRemove("ux0:/data/renderdoc/resources.bin");
-    kuIoOpen("ux0:/data/renderdoc/resources.bin", SCE_O_RDWR | SCE_O_CREAT, &g_resource_fd);
-    kuIoWrite(g_resource_fd, 0, 0);
-    kuIoClose(g_resource_fd);
-    g_resource_fd = -1;
+    sceIoMkdir("ux0:/data/renderdoc", 0777);
+    sceIoRemove("ux0:/data/renderdoc/resources.bin");
+    SceUID resource_fd = sceIoOpen("ux0:/data/renderdoc/resources.bin", SCE_O_RDWR | SCE_O_CREAT, 0777);
+    sceIoWrite(resource_fd, 0, 0);
+    sceIoClose(resource_fd);
+    resource_fd = -1;
 
     File file;
     file.open("ux0:/data/renderdoc/resources.bin");

@@ -9,8 +9,6 @@
 extern "C" {
 #endif
 
-#include <kuio.h>
-
 #ifdef __cplusplus
 }
 #endif
@@ -19,6 +17,7 @@ class File {
 public:
     File() {}
     void open(const char* path);
+    void setPath(const char* path);
     void reopen();
 
     template<typename T>

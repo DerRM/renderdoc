@@ -6,7 +6,6 @@ ResourceManager::ResourceManager()
 
 void ResourceManager::init(File file) {
     m_file = file;
-    m_file.open("ux0:/data/renderdoc/resources.bin");
 }
 
 void ResourceManager::find(GXMType type, uint32_t key, Resource* resource) {
@@ -137,4 +136,8 @@ bool ResourceManager::contains(uint32_t key) {
 
 uint32_t ResourceManager::getFilePos(Resource* resource) {
     return 0;
+}
+
+void ResourceManager::deinit() {
+    m_file.close();
 }
