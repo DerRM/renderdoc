@@ -71,6 +71,7 @@ target_link_libraries(gxm_inject
   SceNet_stub_weak
   SceSysmodule_stub
   SceAppMgr_stub
+  SceGxm_stub
   gcc
   ${CMAKE_BINARY_DIR}/renderdocvita/kernel-stubs/libvita_hook_kernel_stub_weak.a
 )

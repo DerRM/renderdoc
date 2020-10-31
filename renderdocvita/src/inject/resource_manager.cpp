@@ -9,7 +9,7 @@ void ResourceManager::init(File file) {
 }
 
 void ResourceManager::find(GXMType type, uint32_t key, Resource* resource) {
-    m_file.reset();
+    m_file.reopen();
 
     while (true) {
         uint32_t bytesread = m_file.read(*resource);
@@ -64,7 +64,6 @@ void ResourceManager::find(GXMType type, uint32_t key, Resource* resource) {
     }
 
     m_file.close();
-    m_file.reopen();
 }
 
 void ResourceManager::insert(Resource* resource) {
@@ -72,6 +71,8 @@ void ResourceManager::insert(Resource* resource) {
 }
 
 void ResourceManager::add(Resource* resource) {
+
+    m_file.reopen();
 
     m_file.write(resource->type);
     m_file.write(resource->id);
@@ -114,7 +115,6 @@ void ResourceManager::add(Resource* resource) {
     }
 
     m_file.close();
-    m_file.reopen();
 }
 
 void ResourceManager::remove(Resource* resource) {

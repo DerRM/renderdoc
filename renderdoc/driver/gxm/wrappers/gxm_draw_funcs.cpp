@@ -24,6 +24,16 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
   SERIALISE_ELEMENT_TYPED(uint32_t, indexType);
   SERIALISE_ELEMENT_TYPED(uint32_t, indexData);
   SERIALISE_ELEMENT(indexCount);
+  uint32_t streamCount;
+  SERIALISE_ELEMENT(streamCount);
+
+  for(uint32_t stream_index = 0; stream_index < streamCount; ++stream_index)
+  {
+    uint32_t vertexBufferSize;
+    SERIALISE_ELEMENT(vertexBufferSize);
+    const void *data;
+    SERIALISE_ELEMENT_ARRAY(data, vertexBufferSize);
+  }
 
   SERIALISE_CHECK_READ_ERRORS();
 

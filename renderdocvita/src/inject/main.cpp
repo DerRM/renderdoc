@@ -80,10 +80,6 @@ File g_file;
 uint64_t g_fileoffset = 0;
 void* g_framebuffers[64] = {};
 uint32_t g_framebufferCount = 0;
-#define MAX_RESOURCES 4 * 1024
-int16_t g_resources[MAX_RESOURCES] = { -1 };
-uint16_t g_resource_count = 0;
-uint32_t g_resource_offsets[MAX_RESOURCES] = { 0 };
 
 void* g_baseFrame;
 
@@ -359,8 +355,8 @@ static SceUID sceSysmoduleUnloadModuleHook;
 static int sceSysmoduleUnloadModulePatched(SceSysmoduleModuleId id) {
 
     int ret = TAI_NEXT(sceSysmoduleUnloadModule, sceSysmoduleUnloadModuleRef, id);
-
     LOGD("sceSysmoduleUnloadModule(id: %s) called with ret: %" PRIi32 "\n", sysmodule2str(id), ret);
+
 
    // if (ret >= 0 && SCE_SYSMODULE_NET == id) {
     //    taiHookRelease(sceNetInitHook, sceNetInitRef);
@@ -402,7 +398,7 @@ static tai_hook_ref_t sceKernelGetMemBlockBaseRef;
 static SceUID sceKernelGetMemBlockBaseHook;
 int sceKernelGetMemBlockBasePatched(SceUID uid, void **basep) {
     int res = TAI_NEXT(sceKernelGetMemBlockBase, sceKernelGetMemBlockBaseRef, uid, basep);
-    LOGD("sceKernelGetMemBlockBase(uid: %" PRIi32 ", base pointer: %p)\n", uid, *basep);
+    //LOGD("sceKernelGetMemBlockBase(uid: %" PRIi32 ", base pointer: %p)\n", uid, *basep);
     return res;
 }
 
@@ -538,6 +534,187 @@ CREATE_PATCHED_CALL(unsigned int, sceGxmTextureGetWidth, const SceGxmTexture *te
     return TAI_NEXT(sceGxmTextureGetWidth, sceGxmTextureGetWidthRef, texture);
 }
 
+CREATE_PATCHED_CALL(int, sceGxmProgramCheck, const SceGxmProgram *program)
+{
+    LOGD("sceGxmProgramCheck(program: %p)\n", program);
+    return TAI_NEXT(sceGxmProgramCheck, sceGxmProgramCheckRef, program);
+}
+
+CREATE_PATCHED_CALL(const SceGxmProgramParameter *, sceGxmProgramFindParameterByName, const SceGxmProgram *program, const char *name)
+{
+    LOGD("sceGxmProgramFindParameterByName(program: %p, name: %s)\n", program, name);
+    return TAI_NEXT(sceGxmProgramFindParameterByName, sceGxmProgramFindParameterByNameRef, program, name);
+}
+
+CREATE_PATCHED_CALL(const SceGxmProgramParameter *, sceGxmProgramFindParameterBySemantic, const SceGxmProgram *program, SceGxmParameterSemantic semantic, unsigned int index)
+{
+    LOGD("sceGxmProgramFindParameterBySemantic(program: %p, semantic: %" PRIu32 ", index: %" PRIu32 ")\n", program, semantic, index);
+    return TAI_NEXT(sceGxmProgramFindParameterBySemantic, sceGxmProgramFindParameterBySemanticRef, program, semantic, index);
+}
+
+CREATE_PATCHED_CALL(unsigned int, sceGxmProgramGetDefaultUniformBufferSize, const SceGxmProgram *program)
+{
+    LOGD("sceGxmProgramGetDefaultUniformBufferSize(program: %p)\n", program);
+    return TAI_NEXT(sceGxmProgramGetDefaultUniformBufferSize, sceGxmProgramGetDefaultUniformBufferSizeRef, program);
+}
+
+unsigned int sceGxmProgramGetFragmentProgramInputs(const SceGxmProgram *program);
+CREATE_PATCHED_CALL(unsigned int, sceGxmProgramGetFragmentProgramInputs, const SceGxmProgram *program)
+{
+    LOGD("sceGxmProgramGetFragmentProgramInputs(program: %p)\n", program);
+    return TAI_NEXT(sceGxmProgramGetFragmentProgramInputs, sceGxmProgramGetFragmentProgramInputsRef, program);
+}
+
+unsigned int sceGxmProgramGetOutputRegisterFormat(const SceGxmProgram *program, SceGxmParameterType *type, unsigned int *componentCount);
+CREATE_PATCHED_CALL(unsigned int, sceGxmProgramGetOutputRegisterFormat, const SceGxmProgram *program, SceGxmParameterType *type, unsigned int *componentCount)
+{
+    LOGD("sceGxmProgramGetOutputRegisterFormat(program: %p, type: %p, componentCount: %p)\n", program, type, componentCount);
+    return TAI_NEXT(sceGxmProgramGetOutputRegisterFormat, sceGxmProgramGetOutputRegisterFormatRef, program, type, componentCount);
+}
+
+CREATE_PATCHED_CALL(const SceGxmProgramParameter *, sceGxmProgramGetParameter, const SceGxmProgram *program, unsigned int index)
+{
+    LOGD("sceGxmProgramGetParameter(program: %p, index: %" PRIu32 ")\n", program, index);
+    return TAI_NEXT(sceGxmProgramGetParameter, sceGxmProgramGetParameterRef, program, index);
+}
+
+CREATE_PATCHED_CALL(unsigned int, sceGxmProgramGetParameterCount, const SceGxmProgram *program)
+{
+    LOGD("sceGxmProgramGetParameterCount(program: %p)\n", program);
+    return TAI_NEXT(sceGxmProgramGetParameterCount, sceGxmProgramGetParameterCountRef, program);
+}
+
+CREATE_PATCHED_CALL(unsigned int, sceGxmProgramGetSize, const SceGxmProgram *program)
+{
+    LOGD("sceGxmProgramGetSize(program: %p)\n", program);
+    return TAI_NEXT(sceGxmProgramGetSize, sceGxmProgramGetSizeRef, program);
+}
+
+CREATE_PATCHED_CALL(SceGxmProgramType, sceGxmProgramGetType, const SceGxmProgram *program)
+{
+    LOGD("sceGxmProgramGetType(program: %p)\n", program);
+    return TAI_NEXT(sceGxmProgramGetType, sceGxmProgramGetTypeRef, program);
+}
+
+unsigned int sceGxmProgramGetVertexProgramOutputs(const SceGxmProgram *program);
+CREATE_PATCHED_CALL(unsigned int, sceGxmProgramGetVertexProgramOutputs, const SceGxmProgram *program)
+{
+    LOGD("sceGxmProgramGetVertexProgramOutputs(program: %p)\n", program);
+    return TAI_NEXT(sceGxmProgramGetVertexProgramOutputs, sceGxmProgramGetVertexProgramOutputsRef, program);
+}
+
+CREATE_PATCHED_CALL(SceBool, sceGxmProgramIsDepthReplaceUsed, const SceGxmProgram *program)
+{
+    LOGD("sceGxmProgramIsDepthReplaceUsed(program: %p)\n", program);
+    return TAI_NEXT(sceGxmProgramIsDepthReplaceUsed, sceGxmProgramIsDepthReplaceUsedRef, program);
+}
+
+CREATE_PATCHED_CALL(SceBool, sceGxmProgramIsDiscardUsed, const SceGxmProgram *program)
+{
+    LOGD("sceGxmProgramIsDiscardUsed(program: %p)\n", program);
+    return TAI_NEXT(sceGxmProgramIsDiscardUsed, sceGxmProgramIsDiscardUsedRef, program);
+}
+
+SceBool sceGxmProgramIsEquivalent(const SceGxmProgram *programA, const SceGxmProgram *programB);
+CREATE_PATCHED_CALL(SceBool, sceGxmProgramIsEquivalent, const SceGxmProgram *programA, const SceGxmProgram *programB)
+{
+    LOGD("sceGxmProgramIsEquivalent(programA: %p, programB: %p)\n", programA, programB);
+    return TAI_NEXT(sceGxmProgramIsEquivalent, sceGxmProgramIsEquivalentRef, programA, programB);
+}
+
+SceBool sceGxmProgramIsFragColorUsed(const SceGxmProgram *program);
+CREATE_PATCHED_CALL(SceBool, sceGxmProgramIsFragColorUsed, const SceGxmProgram *program)
+{
+    LOGD("sceGxmProgramIsFragColorUsed(program: %p)\n", program);
+    return TAI_NEXT(sceGxmProgramIsFragColorUsed, sceGxmProgramIsFragColorUsedRef, program);
+}
+
+SceBool sceGxmProgramIsNativeColorUsed(const SceGxmProgram *program);
+CREATE_PATCHED_CALL(SceBool, sceGxmProgramIsNativeColorUsed, const SceGxmProgram *program)
+{
+    LOGD("sceGxmProgramIsNativeColorUsed(program: %p)\n", program);
+    return TAI_NEXT(sceGxmProgramIsNativeColorUsed, sceGxmProgramIsNativeColorUsedRef, program);
+}
+
+CREATE_PATCHED_CALL(SceBool, sceGxmProgramIsSpriteCoordUsed, const SceGxmProgram *program)
+{
+    LOGD("sceGxmProgramIsSpriteCoordUsed(program: %p)\n", program);
+    return TAI_NEXT(sceGxmProgramIsSpriteCoordUsed, sceGxmProgramIsSpriteCoordUsedRef, program);
+}
+
+CREATE_PATCHED_CALL(unsigned int, sceGxmProgramParameterGetArraySize, const SceGxmProgramParameter *parameter)
+{
+    LOGD("sceGxmProgramParameterGetArraySize(parameter: %p)\n", parameter);
+    return TAI_NEXT(sceGxmProgramParameterGetArraySize, sceGxmProgramParameterGetArraySizeRef, parameter);
+}
+
+CREATE_PATCHED_CALL(SceGxmParameterCategory, sceGxmProgramParameterGetCategory, const SceGxmProgramParameter *parameter)
+{
+    LOGD("sceGxmProgramParameterGetCategory(parameter: %p)\n", parameter);
+    return TAI_NEXT(sceGxmProgramParameterGetCategory, sceGxmProgramParameterGetCategoryRef, parameter);
+}
+
+CREATE_PATCHED_CALL(unsigned int, sceGxmProgramParameterGetComponentCount, const SceGxmProgramParameter *parameter)
+{
+    LOGD("sceGxmProgramParameterGetComponentCount(parameter: %p)\n", parameter);
+    return TAI_NEXT(sceGxmProgramParameterGetComponentCount, sceGxmProgramParameterGetComponentCountRef, parameter);
+}
+
+CREATE_PATCHED_CALL(unsigned int, sceGxmProgramParameterGetContainerIndex, const SceGxmProgramParameter *parameter)
+{
+    LOGD("sceGxmProgramParameterGetContainerIndex(parameter: %p)\n", parameter);
+    return TAI_NEXT(sceGxmProgramParameterGetContainerIndex, sceGxmProgramParameterGetContainerIndexRef, parameter);
+}
+
+CREATE_PATCHED_CALL(unsigned int, sceGxmProgramParameterGetIndex, const SceGxmProgram *program, const SceGxmProgramParameter *parameter)
+{
+    LOGD("sceGxmProgramParameterGetIndex(program: %p, parameter: %p)\n", program, parameter);
+    return TAI_NEXT(sceGxmProgramParameterGetIndex, sceGxmProgramParameterGetIndexRef, program, parameter);
+}
+
+CREATE_PATCHED_CALL(const char *, sceGxmProgramParameterGetName, const SceGxmProgramParameter *parameter)
+{
+    LOGD("sceGxmProgramParameterGetName(parameter: %p)\n", parameter);
+    return TAI_NEXT(sceGxmProgramParameterGetName, sceGxmProgramParameterGetNameRef, parameter);
+}
+
+CREATE_PATCHED_CALL(unsigned int, sceGxmProgramParameterGetResourceIndex, const SceGxmProgramParameter *parameter)
+{
+    LOGD("sceGxmProgramParameterGetResourceIndex(parameter: %p)\n", parameter);
+    return TAI_NEXT(sceGxmProgramParameterGetResourceIndex, sceGxmProgramParameterGetResourceIndexRef, parameter);
+}
+
+CREATE_PATCHED_CALL(SceGxmParameterSemantic, sceGxmProgramParameterGetSemantic, const SceGxmProgramParameter *parameter)
+{
+    LOGD("sceGxmProgramParameterGetSemantic(parameter: %p)\n", parameter);
+    return TAI_NEXT(sceGxmProgramParameterGetSemantic, sceGxmProgramParameterGetSemanticRef, parameter);
+}
+
+CREATE_PATCHED_CALL(unsigned int, sceGxmProgramParameterGetSemanticIndex, const SceGxmProgramParameter *parameter)
+{
+    LOGD("sceGxmProgramParameterGetSemanticIndex(parameter: %p)\n", parameter);
+    return TAI_NEXT(sceGxmProgramParameterGetSemanticIndex, sceGxmProgramParameterGetSemanticIndexRef, parameter);
+}
+
+CREATE_PATCHED_CALL(SceGxmParameterType, sceGxmProgramParameterGetType, const SceGxmProgramParameter *parameter)
+{
+    LOGD("sceGxmProgramParameterGetType(parameter: %p)\n", parameter);
+    return TAI_NEXT(sceGxmProgramParameterGetType, sceGxmProgramParameterGetTypeRef, parameter);
+}
+
+SceBool sceGxmProgramParameterIsRegFormat(const SceGxmProgram *program, const SceGxmProgramParameter *parameter);
+CREATE_PATCHED_CALL(SceBool, sceGxmProgramParameterIsRegFormat, const SceGxmProgram *program, const SceGxmProgramParameter *parameter)
+{
+    LOGD("sceGxmProgramParameterIsRegFormat(program: %p, parameter: %p)\n", program, parameter);
+    return TAI_NEXT(sceGxmProgramParameterIsRegFormat, sceGxmProgramParameterIsRegFormatRef, program, parameter);
+}
+
+CREATE_PATCHED_CALL(SceBool, sceGxmProgramParameterIsSamplerCube, const SceGxmProgramParameter *parameter)
+{
+    LOGD("sceGxmProgramParameterIsSamplerCube(parameter: %p)\n", parameter);
+    return TAI_NEXT(sceGxmProgramParameterIsSamplerCube, sceGxmProgramParameterIsSamplerCubeRef, parameter);
+}
+
 int sceGxmAddRazorGpuCaptureBuffer(void* base, unsigned int size);
 CREATE_PATCHED_CALL(int, sceGxmAddRazorGpuCaptureBuffer, void* base, unsigned int size)
 {
@@ -569,9 +746,9 @@ CREATE_PATCHED_CALL(int, sceGxmBeginScene, SceGxmContext *context, unsigned int 
         g_fileoffset += g_file.write(fragmentSyncObject);
         g_fileoffset += g_file.write(colorSurface);
         g_fileoffset += g_file.write(depthStencil);
-        LOG("sceGxmBeginScene(context: %p, flags: %d, rendertarget: %p, validRegion: %p, vertexSyncObject: %p, fragmentSyncObject: %p, colorSurface: %p, depthStencil: %p)\n", context, flags, renderTarget, validRegion, vertexSyncObject, fragmentSyncObject, colorSurface, depthStencil);
     }
 
+    LOGD("sceGxmBeginScene(context: %p, flags: %d, rendertarget: %p, validRegion: %p, vertexSyncObject: %p, fragmentSyncObject: %p, colorSurface: %p, depthStencil: %p)\n", context, flags, renderTarget, validRegion, vertexSyncObject, fragmentSyncObject, colorSurface, depthStencil);
     return TAI_NEXT(sceGxmBeginScene, sceGxmBeginSceneRef, context, flags, renderTarget, validRegion, vertexSyncObject, fragmentSyncObject, colorSurface, depthStencil);
 }
 
@@ -632,11 +809,7 @@ CREATE_PATCHED_CALL(SceGxmColorSurfaceType, sceGxmColorSurfaceGetType, const Sce
 
 CREATE_PATCHED_CALL(int, sceGxmColorSurfaceInit, SceGxmColorSurface *surface, SceGxmColorFormat colorFormat, SceGxmColorSurfaceType surfaceType, SceGxmColorSurfaceScaleMode scaleMode, SceGxmOutputRegisterSize outputRegisterSize, unsigned int width, unsigned int height, unsigned int strideInPixels, void *data)
 {
-    if (colorFormat == 0 && width == 960 && height == 544) 
-    {
-        LOG("sceGxmColorSurfaceInit(surface: %p, colorFormat: %" PRIu32 ", surfaceType: %" PRIu32 ", scaleMode: %" PRIu32", outputRegisterSize: %" PRIu32 ", width: %" PRIu32 ", height: %" PRIu32 ", strideInPixels: %" PRIu32 ", data: %p)\n", surface, colorFormat, surfaceType, scaleMode, outputRegisterSize, width, height, strideInPixels, data);
-        g_framebuffers[g_framebufferCount++] = data;
-    }
+    LOGD("sceGxmColorSurfaceInit(surface: %p, colorFormat: %" PRIu32 ", surfaceType: %" PRIu32 ", scaleMode: %" PRIu32", outputRegisterSize: %" PRIu32 ", width: %" PRIu32 ", height: %" PRIu32 ", strideInPixels: %" PRIu32 ", data: %p)\n", surface, colorFormat, surfaceType, scaleMode, outputRegisterSize, width, height, strideInPixels, data);
     return TAI_NEXT(sceGxmColorSurfaceInit, sceGxmColorSurfaceInitRef, surface, colorFormat, surfaceType, scaleMode, outputRegisterSize, width, height, strideInPixels, data);
 }
 
@@ -831,8 +1004,8 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
         g_fileoffset += g_file.write(oldBuffer);
         g_fileoffset += g_file.write(newBuffer);
         g_fileoffset += g_file.write(callbackData);
-        LOGD("sceGxmDisplayQueueAddEntry(oldBuffer: %p, newBuffer: %p, callbackData: %p)\n", oldBuffer, newBuffer, callbackData);
     }
+    LOGD("sceGxmDisplayQueueAddEntry(oldBuffer: %p, newBuffer: %p, callbackData: %p)\n", oldBuffer, newBuffer, callbackData);
 
     int ret = TAI_NEXT(sceGxmDisplayQueueAddEntry, sceGxmDisplayQueueAddEntryRef, oldBuffer, newBuffer, callbackData);
     
@@ -922,6 +1095,10 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueFinish)
 
 CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType primType, SceGxmIndexFormat indexType, const void* indexData, unsigned int indexCount)
 {
+    LOGD("sceGxmDraw(context: %p, primType: %" PRIu32 ", indexType: %" PRIu32 ", indexData: %p, indexCount: %" PRIu32 ")\n", context, primType, indexType, indexData, indexCount);
+    
+    int res = TAI_NEXT(sceGxmDraw, sceGxmDrawRef, context, primType, indexType, indexData, indexCount);
+
     if (g_log) {
         uint32_t chunkSize = 0;
 
@@ -933,23 +1110,19 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
         g_fileoffset += g_file.write(indexType);
         g_fileoffset += g_file.write(indexData);
         g_fileoffset += g_file.write(indexCount);
-/*
-        kuIoClose(g_fd);
 
         VertexProgramResource vertexRes;
         g_resource_manager.find(GXMType::SceGxmVertexProgram, (uint32_t)g_activeVertexProgram, &vertexRes);
 
-        kuIoOpen(fname, SCE_O_WRONLY | SCE_O_APPEND, &g_fd);
-
-        LOG("sceGxmDraw, active vertex program: attribute count %" PRIu32 "\n", vertexRes.attributeCount);
+        LOGD("sceGxmDraw, active vertex program: attribute count %" PRIu32 "\n", vertexRes.attributeCount);
         for (uint32_t attribute_index = 0; attribute_index < vertexRes.attributeCount; ++attribute_index) {
             SceGxmVertexAttribute& attribute = vertexRes.attributes[attribute_index];
-            LOG("\tattribute: stream index: %" PRIu16 ", offset: %" PRIu16 ", format %s, componentCount: %" PRIu8 ", regIndex: %" PRIu16 "\n", attribute.streamIndex, attribute.offset, attributeFormat2str(attribute.format), attribute.componentCount, attribute.regIndex);
+            LOGD("\tattribute: stream index: %" PRIu16 ", offset: %" PRIu16 ", format %s, componentCount: %" PRIu8 ", regIndex: %" PRIu16 "\n", attribute.streamIndex, attribute.offset, attributeFormat2str(attribute.format), attribute.componentCount, attribute.regIndex);
         }
-        LOG("sceGxmDraw, streamCount: %" PRIu32 "\n", vertexRes.streamCount);
+        LOGD("sceGxmDraw, streamCount: %" PRIu32 "\n", vertexRes.streamCount);
         for (uint32_t stream_index = 0; stream_index < vertexRes.streamCount; ++stream_index) {
             SceGxmVertexStream& stream = vertexRes.streams[stream_index];
-            LOG("\tstream: stride %" PRIu16 ", indexSource: %" PRIu16 "\n", stream.stride, stream.indexSource);
+            LOGD("\tstream: stride %" PRIu16 ", indexSource: %" PRIu16 "\n", stream.stride, stream.indexSource);
         }
 
         uint32_t max_index = 0;
@@ -974,23 +1147,32 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
             default: break;
         }
 
-        LOG("sceGxmDraw, max_index: %" PRIu32 "\n", max_index);
+        LOGD("sceGxmDraw, max_index: %" PRIu32 "\n", max_index);
 
-        kuIoWrite(g_fd, &vertexRes.streamCount, sizeof(uint32_t));
-        g_fileoffset += 4;
+        //ProgramResource programRes;
+        //g_resource_manager.find(GXMType::SceGxmProgram, (uint32_t)vertexRes.programId, &programRes);
+
+        //uint32_t parameter_count = sceGxmProgramGetParameterCount(programRes.program);
+
+        //LOGD("sceGxmDraw: program length: %" PRIu32 ", parameter count: %" PRIu32 "\n", programRes.programLength, parameter_count);
+
+        g_fileoffset += g_file.write(vertexRes.streamCount);
 
         for (uint32_t stream_index = 0; stream_index < vertexRes.streamCount; ++stream_index) {
             uint32_t vertexBufferSize = (max_index + 1) * vertexRes.streams[stream_index].stride;
-            kuIoWrite(g_fd, &vertexBufferSize, sizeof(uint32_t));
-            g_fileoffset += sizeof(uint32_t);
-            kuIoWrite(g_fd, g_activeVertexStreams[vertexRes.streams[stream_index].indexSource], vertexBufferSize);
-            g_fileoffset += vertexBufferSize;
+            g_fileoffset += g_file.write(vertexBufferSize);
+            g_fileoffset += g_file.write((uint64_t)vertexBufferSize);
+            const uint32_t ALIGNMENT = 64;
+            uint8_t alignmentBytes[ALIGNMENT] = { 0 };
+            uint32_t fillbyteSize = ALIGNMENT - (g_fileoffset % ALIGNMENT);
+            LOGD("sceGxmDraw: fillbytes: %" PRIu32 "\n", fillbyteSize);
+            g_fileoffset += g_file.write(alignmentBytes, fillbyteSize);
+            g_fileoffset += g_file.write(g_activeVertexStreams[vertexRes.streams[stream_index].indexSource], vertexBufferSize);
         }
-*/
-        LOG("sceGxmDraw(context: %p, primType: %" PRIu32 ", indexType: %" PRIu32 ", indexData: %p, indexCount: %" PRIu32 ")\n", context, primType, indexType, indexData, indexCount);
+
     }
 
-    return TAI_NEXT(sceGxmDraw, sceGxmDrawRef, context, primType, indexType, indexData, indexCount);
+    return res;
 }
 
 CREATE_PATCHED_CALL(int, sceGxmDrawInstanced, SceGxmContext *context, SceGxmPrimitiveType primType, SceGxmIndexFormat indexType, const void *indexData, unsigned int indexCount, unsigned int indexWrap)
@@ -1023,9 +1205,9 @@ CREATE_PATCHED_CALL(int, sceGxmEndScene, SceGxmContext *context, const SceGxmNot
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(vertexNotification);
         g_fileoffset += g_file.write(fragmentNotification);
-        LOGD("sceGxmEndScene(context: %p, flags: %" PRIu32 ", vertexNotification: %p, fragmentNotification: %p)\n", context, vertexNotification, fragmentNotification);
     }
 
+    LOGD("sceGxmEndScene(context: %p, flags: %" PRIu32 ", vertexNotification: %p, fragmentNotification: %p)\n", context, vertexNotification, fragmentNotification);
     return TAI_NEXT(sceGxmEndScene, sceGxmEndSceneRef, context, vertexNotification, fragmentNotification);
 }
 
@@ -1211,9 +1393,9 @@ CREATE_PATCHED_CALL(int, sceGxmPadHeartbeat, const SceGxmColorSurface *displaySu
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(displaySurface);
         g_fileoffset += g_file.write(displaySyncObject);
-        LOGD("sceGxmPadHeartbeat(displaySurface: %p, displaySyncObject: %p)\n", displaySurface, displaySyncObject);
     }
 
+    LOGD("sceGxmPadHeartbeat(displaySurface: %p, displaySyncObject: %p)\n", displaySurface, displaySyncObject);
     return TAI_NEXT(sceGxmPadHeartbeat, sceGxmPadHeartbeatRef, displaySurface, displaySyncObject);
 }
 
@@ -1279,7 +1461,7 @@ CREATE_PATCHED_CALL(int, sceGxmPrecomputedFragmentStateSetAllAuxiliarySurfaces, 
 
 CREATE_PATCHED_CALL(int, sceGxmPrecomputedFragmentStateSetAllTextures, SceGxmPrecomputedFragmentState *precomputedState, const SceGxmTexture *textureArray)
 {
-    LOG("sceGxmPrecomputedFragmentStateSetAllTextures(precomputedState, %p, textureArray: %p)\n", precomputedState, textureArray);
+    LOGD("sceGxmPrecomputedFragmentStateSetAllTextures(precomputedState, %p, textureArray: %p)\n", precomputedState, textureArray);
     return TAI_NEXT(sceGxmPrecomputedFragmentStateSetAllTextures, sceGxmPrecomputedFragmentStateSetAllTexturesRef, precomputedState, textureArray);
 }
 
@@ -1321,7 +1503,7 @@ CREATE_PATCHED_CALL(int, sceGxmPrecomputedVertexStateInit, SceGxmPrecomputedVert
 
 CREATE_PATCHED_CALL(int, sceGxmPrecomputedVertexStateSetAllTextures, SceGxmPrecomputedVertexState *precomputedState, const SceGxmTexture *textures)
 {
-    LOG("sceGxmPrecomputedVertexStateSetAllTextures(precomputedState, %p, textures: %p)\n", precomputedState, textures);
+    LOGD("sceGxmPrecomputedVertexStateSetAllTextures(precomputedState, %p, textures: %p)\n", precomputedState, textures);
     return TAI_NEXT(sceGxmPrecomputedVertexStateSetAllTextures, sceGxmPrecomputedVertexStateSetAllTexturesRef, precomputedState, textures);
 }
 
@@ -1347,187 +1529,6 @@ CREATE_PATCHED_CALL(int, sceGxmPrecomputedVertexStateSetUniformBuffer, SceGxmPre
 {
     LOGD("sceGxmPrecomputedVertexStateSetUniformBuffer(precomputedState, %p, bufferIndex: %" PRIu32 ", bufferData: %p)\n", precomputedState, bufferIndex, bufferData);
     return TAI_NEXT(sceGxmPrecomputedVertexStateSetUniformBuffer, sceGxmPrecomputedVertexStateSetUniformBufferRef, precomputedState, bufferIndex, bufferData);
-}
-
-CREATE_PATCHED_CALL(int, sceGxmProgramCheck, const SceGxmProgram *program)
-{
-    LOGD("sceGxmProgramCheck(program: %p)\n", program);
-    return TAI_NEXT(sceGxmProgramCheck, sceGxmProgramCheckRef, program);
-}
-
-CREATE_PATCHED_CALL(const SceGxmProgramParameter *, sceGxmProgramFindParameterByName, const SceGxmProgram *program, const char *name)
-{
-    LOGD("sceGxmProgramFindParameterByName(program: %p, name: %s)\n", program, name);
-    return TAI_NEXT(sceGxmProgramFindParameterByName, sceGxmProgramFindParameterByNameRef, program, name);
-}
-
-CREATE_PATCHED_CALL(const SceGxmProgramParameter *, sceGxmProgramFindParameterBySemantic, const SceGxmProgram *program, SceGxmParameterSemantic semantic, unsigned int index)
-{
-    LOGD("sceGxmProgramFindParameterBySemantic(program: %p, semantic: %" PRIu32 ", index: %" PRIu32 ")\n", program, semantic, index);
-    return TAI_NEXT(sceGxmProgramFindParameterBySemantic, sceGxmProgramFindParameterBySemanticRef, program, semantic, index);
-}
-
-CREATE_PATCHED_CALL(unsigned int, sceGxmProgramGetDefaultUniformBufferSize, const SceGxmProgram *program)
-{
-    LOGD("sceGxmProgramGetDefaultUniformBufferSize(program: %p)\n", program);
-    return TAI_NEXT(sceGxmProgramGetDefaultUniformBufferSize, sceGxmProgramGetDefaultUniformBufferSizeRef, program);
-}
-
-unsigned int sceGxmProgramGetFragmentProgramInputs(const SceGxmProgram *program);
-CREATE_PATCHED_CALL(unsigned int, sceGxmProgramGetFragmentProgramInputs, const SceGxmProgram *program)
-{
-    LOGD("sceGxmProgramGetFragmentProgramInputs(program: %p)\n", program);
-    return TAI_NEXT(sceGxmProgramGetFragmentProgramInputs, sceGxmProgramGetFragmentProgramInputsRef, program);
-}
-
-unsigned int sceGxmProgramGetOutputRegisterFormat(const SceGxmProgram *program, SceGxmParameterType *type, unsigned int *componentCount);
-CREATE_PATCHED_CALL(unsigned int, sceGxmProgramGetOutputRegisterFormat, const SceGxmProgram *program, SceGxmParameterType *type, unsigned int *componentCount)
-{
-    LOGD("sceGxmProgramGetOutputRegisterFormat(program: %p, type: %p, componentCount: %p)\n", program, type, componentCount);
-    return TAI_NEXT(sceGxmProgramGetOutputRegisterFormat, sceGxmProgramGetOutputRegisterFormatRef, program, type, componentCount);
-}
-
-CREATE_PATCHED_CALL(const SceGxmProgramParameter *, sceGxmProgramGetParameter, const SceGxmProgram *program, unsigned int index)
-{
-    LOGD("sceGxmProgramGetParameter(program: %p, index: %" PRIu32 ")\n", program, index);
-    return TAI_NEXT(sceGxmProgramGetParameter, sceGxmProgramGetParameterRef, program, index);
-}
-
-CREATE_PATCHED_CALL(unsigned int, sceGxmProgramGetParameterCount, const SceGxmProgram *program)
-{
-    LOGD("sceGxmProgramGetParameterCount(program: %p)\n", program);
-    return TAI_NEXT(sceGxmProgramGetParameterCount, sceGxmProgramGetParameterCountRef, program);
-}
-
-CREATE_PATCHED_CALL(unsigned int, sceGxmProgramGetSize, const SceGxmProgram *program)
-{
-    LOGD("sceGxmProgramGetSize(program: %p)\n", program);
-    return TAI_NEXT(sceGxmProgramGetSize, sceGxmProgramGetSizeRef, program);
-}
-
-CREATE_PATCHED_CALL(SceGxmProgramType, sceGxmProgramGetType, const SceGxmProgram *program)
-{
-    LOGD("sceGxmProgramGetType(program: %p)\n", program);
-    return TAI_NEXT(sceGxmProgramGetType, sceGxmProgramGetTypeRef, program);
-}
-
-unsigned int sceGxmProgramGetVertexProgramOutputs(const SceGxmProgram *program);
-CREATE_PATCHED_CALL(unsigned int, sceGxmProgramGetVertexProgramOutputs, const SceGxmProgram *program)
-{
-    LOGD("sceGxmProgramGetVertexProgramOutputs(program: %p)\n", program);
-    return TAI_NEXT(sceGxmProgramGetVertexProgramOutputs, sceGxmProgramGetVertexProgramOutputsRef, program);
-}
-
-CREATE_PATCHED_CALL(SceBool, sceGxmProgramIsDepthReplaceUsed, const SceGxmProgram *program)
-{
-    LOGD("sceGxmProgramIsDepthReplaceUsed(program: %p)\n", program);
-    return TAI_NEXT(sceGxmProgramIsDepthReplaceUsed, sceGxmProgramIsDepthReplaceUsedRef, program);
-}
-
-CREATE_PATCHED_CALL(SceBool, sceGxmProgramIsDiscardUsed, const SceGxmProgram *program)
-{
-    LOGD("sceGxmProgramIsDiscardUsed(program: %p)\n", program);
-    return TAI_NEXT(sceGxmProgramIsDiscardUsed, sceGxmProgramIsDiscardUsedRef, program);
-}
-
-SceBool sceGxmProgramIsEquivalent(const SceGxmProgram *programA, const SceGxmProgram *programB);
-CREATE_PATCHED_CALL(SceBool, sceGxmProgramIsEquivalent, const SceGxmProgram *programA, const SceGxmProgram *programB)
-{
-    LOGD("sceGxmProgramIsEquivalent(programA: %p, programB: %p)\n", programA, programB);
-    return TAI_NEXT(sceGxmProgramIsEquivalent, sceGxmProgramIsEquivalentRef, programA, programB);
-}
-
-SceBool sceGxmProgramIsFragColorUsed(const SceGxmProgram *program);
-CREATE_PATCHED_CALL(SceBool, sceGxmProgramIsFragColorUsed, const SceGxmProgram *program)
-{
-    LOGD("sceGxmProgramIsFragColorUsed(program: %p)\n", program);
-    return TAI_NEXT(sceGxmProgramIsFragColorUsed, sceGxmProgramIsFragColorUsedRef, program);
-}
-
-SceBool sceGxmProgramIsNativeColorUsed(const SceGxmProgram *program);
-CREATE_PATCHED_CALL(SceBool, sceGxmProgramIsNativeColorUsed, const SceGxmProgram *program)
-{
-    LOGD("sceGxmProgramIsNativeColorUsed(program: %p)\n", program);
-    return TAI_NEXT(sceGxmProgramIsNativeColorUsed, sceGxmProgramIsNativeColorUsedRef, program);
-}
-
-CREATE_PATCHED_CALL(SceBool, sceGxmProgramIsSpriteCoordUsed, const SceGxmProgram *program)
-{
-    LOGD("sceGxmProgramIsSpriteCoordUsed(program: %p)\n", program);
-    return TAI_NEXT(sceGxmProgramIsSpriteCoordUsed, sceGxmProgramIsSpriteCoordUsedRef, program);
-}
-
-CREATE_PATCHED_CALL(unsigned int, sceGxmProgramParameterGetArraySize, const SceGxmProgramParameter *parameter)
-{
-    LOGD("sceGxmProgramParameterGetArraySize(parameter: %p)\n", parameter);
-    return TAI_NEXT(sceGxmProgramParameterGetArraySize, sceGxmProgramParameterGetArraySizeRef, parameter);
-}
-
-CREATE_PATCHED_CALL(SceGxmParameterCategory, sceGxmProgramParameterGetCategory, const SceGxmProgramParameter *parameter)
-{
-    LOGD("sceGxmProgramParameterGetCategory(parameter: %p)\n", parameter);
-    return TAI_NEXT(sceGxmProgramParameterGetCategory, sceGxmProgramParameterGetCategoryRef, parameter);
-}
-
-CREATE_PATCHED_CALL(unsigned int, sceGxmProgramParameterGetComponentCount, const SceGxmProgramParameter *parameter)
-{
-    LOGD("sceGxmProgramParameterGetComponentCount(parameter: %p)\n", parameter);
-    return TAI_NEXT(sceGxmProgramParameterGetComponentCount, sceGxmProgramParameterGetComponentCountRef, parameter);
-}
-
-CREATE_PATCHED_CALL(unsigned int, sceGxmProgramParameterGetContainerIndex, const SceGxmProgramParameter *parameter)
-{
-    LOGD("sceGxmProgramParameterGetContainerIndex(parameter: %p)\n", parameter);
-    return TAI_NEXT(sceGxmProgramParameterGetContainerIndex, sceGxmProgramParameterGetContainerIndexRef, parameter);
-}
-
-CREATE_PATCHED_CALL(unsigned int, sceGxmProgramParameterGetIndex, const SceGxmProgram *program, const SceGxmProgramParameter *parameter)
-{
-    LOGD("sceGxmProgramParameterGetIndex(program: %p, parameter: %p)\n", program, parameter);
-    return TAI_NEXT(sceGxmProgramParameterGetIndex, sceGxmProgramParameterGetIndexRef, program, parameter);
-}
-
-CREATE_PATCHED_CALL(const char *, sceGxmProgramParameterGetName, const SceGxmProgramParameter *parameter)
-{
-    LOGD("sceGxmProgramParameterGetName(parameter: %p)\n", parameter);
-    return TAI_NEXT(sceGxmProgramParameterGetName, sceGxmProgramParameterGetNameRef, parameter);
-}
-
-CREATE_PATCHED_CALL(unsigned int, sceGxmProgramParameterGetResourceIndex, const SceGxmProgramParameter *parameter)
-{
-    LOGD("sceGxmProgramParameterGetResourceIndex(parameter: %p)\n", parameter);
-    return TAI_NEXT(sceGxmProgramParameterGetResourceIndex, sceGxmProgramParameterGetResourceIndexRef, parameter);
-}
-
-CREATE_PATCHED_CALL(SceGxmParameterSemantic, sceGxmProgramParameterGetSemantic, const SceGxmProgramParameter *parameter)
-{
-    LOGD("sceGxmProgramParameterGetSemantic(parameter: %p)\n", parameter);
-    return TAI_NEXT(sceGxmProgramParameterGetSemantic, sceGxmProgramParameterGetSemanticRef, parameter);
-}
-
-CREATE_PATCHED_CALL(unsigned int, sceGxmProgramParameterGetSemanticIndex, const SceGxmProgramParameter *parameter)
-{
-    LOGD("sceGxmProgramParameterGetSemanticIndex(parameter: %p)\n", parameter);
-    return TAI_NEXT(sceGxmProgramParameterGetSemanticIndex, sceGxmProgramParameterGetSemanticIndexRef, parameter);
-}
-
-CREATE_PATCHED_CALL(SceGxmParameterType, sceGxmProgramParameterGetType, const SceGxmProgramParameter *parameter)
-{
-    LOGD("sceGxmProgramParameterGetType(parameter: %p)\n", parameter);
-    return TAI_NEXT(sceGxmProgramParameterGetType, sceGxmProgramParameterGetTypeRef, parameter);
-}
-
-SceBool sceGxmProgramParameterIsRegFormat(const SceGxmProgram *program, const SceGxmProgramParameter *parameter);
-CREATE_PATCHED_CALL(SceBool, sceGxmProgramParameterIsRegFormat, const SceGxmProgram *program, const SceGxmProgramParameter *parameter)
-{
-    LOGD("sceGxmProgramParameterIsRegFormat(program: %p, parameter: %p)\n", program, parameter);
-    return TAI_NEXT(sceGxmProgramParameterIsRegFormat, sceGxmProgramParameterIsRegFormatRef, program, parameter);
-}
-
-CREATE_PATCHED_CALL(SceBool, sceGxmProgramParameterIsSamplerCube, const SceGxmProgramParameter *parameter)
-{
-    LOGD("sceGxmProgramParameterIsSamplerCube(parameter: %p)\n", parameter);
-    return TAI_NEXT(sceGxmProgramParameterIsSamplerCube, sceGxmProgramParameterIsSamplerCubeRef, parameter);
 }
 
 CREATE_PATCHED_CALL(int, sceGxmPushUserMarker, SceGxmContext *context, const char *tag)
@@ -1557,6 +1558,7 @@ CREATE_PATCHED_CALL(int, sceGxmRenderTargetGetHostMem, const SceGxmRenderTarget 
 
 CREATE_PATCHED_CALL(int, sceGxmReserveFragmentDefaultUniformBuffer, SceGxmContext *context, void **uniformBuffer)
 {
+    int res = TAI_NEXT(sceGxmReserveFragmentDefaultUniformBuffer, sceGxmReserveFragmentDefaultUniformBufferRef, context, uniformBuffer);
     if (g_log) {
         uint32_t chunkSize = 0;
 
@@ -1565,10 +1567,10 @@ CREATE_PATCHED_CALL(int, sceGxmReserveFragmentDefaultUniformBuffer, SceGxmContex
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(uniformBuffer);
-        LOG("sceGxmReserveFragmentDefaultUniformBuffer(context: %p, uniformBuffer: %p)\n", context, uniformBuffer);
     }
 
-    return TAI_NEXT(sceGxmReserveFragmentDefaultUniformBuffer, sceGxmReserveFragmentDefaultUniformBufferRef, context, uniformBuffer);
+    LOGD("sceGxmReserveFragmentDefaultUniformBuffer(context: %p, uniformBuffer: %p)\n", context, uniformBuffer);
+    return res;
 }
 
 CREATE_PATCHED_CALL(int, sceGxmReserveVertexDefaultUniformBuffer, SceGxmContext *context, void **uniformBuffer)
@@ -1581,9 +1583,9 @@ CREATE_PATCHED_CALL(int, sceGxmReserveVertexDefaultUniformBuffer, SceGxmContext 
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(uniformBuffer);
-        LOG("sceGxmReserveVertexDefaultUniformBuffer(context: %p, uniformBuffer: %p)\n", context, uniformBuffer);
     }
 
+    LOGD("sceGxmReserveVertexDefaultUniformBuffer(context: %p, uniformBuffer: %p)\n", context, uniformBuffer);
     return TAI_NEXT(sceGxmReserveVertexDefaultUniformBuffer, sceGxmReserveVertexDefaultUniformBufferRef, context, uniformBuffer);
 }
 
@@ -1716,20 +1718,20 @@ CREATE_PATCHED_CALL(void, sceGxmSetFragmentProgram, SceGxmContext *context, cons
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(fragmentProgram);
-        LOG("sceGxmSetFragmentProgram(context: %p, fragmentProgram: %p)\n", context, fragmentProgram);
     }
 
+    LOGD("sceGxmSetFragmentProgram(context: %p, fragmentProgram: %p)\n", context, fragmentProgram);
     TAI_NEXT(sceGxmSetFragmentProgram, sceGxmSetFragmentProgramRef, context, fragmentProgram);
 }
 
 CREATE_PATCHED_CALL(int, sceGxmSetFragmentTexture, SceGxmContext *context, unsigned int textureIndex, const SceGxmTexture *texture)
 {
-    void* data = TAI_NEXT(sceGxmTextureGetData, sceGxmTextureGetDataRef, texture);
-    SceGxmTextureFormat format = TAI_NEXT(sceGxmTextureGetFormat, sceGxmTextureGetFormatRef, texture);
-    uint32_t width = TAI_NEXT(sceGxmTextureGetWidth, sceGxmTextureGetWidthRef, texture);
-    uint32_t height = TAI_NEXT(sceGxmTextureGetHeight, sceGxmTextureGetHeightRef, texture);
-
     LOGD("sceGxmSetFragmentTexture(context: %p, textureIndex: %" PRIu32 ", texture: %p)\n", context, textureIndex, texture);
+    void* data = sceGxmTextureGetData(texture);
+    SceGxmTextureFormat format = sceGxmTextureGetFormat(texture);
+    uint32_t width = sceGxmTextureGetWidth(texture);
+    uint32_t height = sceGxmTextureGetHeight(texture);
+
     LOGD("\tuse texture: data: %p, textureBaseFormat: %s, textureSwizzleMode: %s, width: %" PRIu32 ", height: %" PRIu32 "\n", data, textureBaseFormat2str(format), textureSwizzleMode2str(format), width, height);
     return TAI_NEXT(sceGxmSetFragmentTexture, sceGxmSetFragmentTextureRef, context, textureIndex, texture);
 }
@@ -1756,9 +1758,9 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontDepthFunc, SceGxmContext *context, SceGx
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(depthFunc);
-        LOG("sceGxmSetFrontDepthFunc(context: %p, depthFunc: %" PRIu32 ")\n", context, depthFunc);
     }
 
+    LOGD("sceGxmSetFrontDepthFunc(context: %p, depthFunc: %" PRIu32 ")\n", context, depthFunc);
     TAI_NEXT(sceGxmSetFrontDepthFunc, sceGxmSetFrontDepthFuncRef, context, depthFunc);
 }
 
@@ -1772,10 +1774,10 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontDepthWriteEnable, SceGxmContext *context
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(enable);
-        LOG("sceGxmSetFrontDepthWriteEnable(context: %p, enable: %" PRIu32 ")\n", context, enable);
 
     }
 
+    LOGD("sceGxmSetFrontDepthWriteEnable(context: %p, enable: %" PRIu32 ")\n", context, enable);
     TAI_NEXT(sceGxmSetFrontDepthWriteEnable, sceGxmSetFrontDepthWriteEnableRef, context, enable);
 }
 
@@ -1818,9 +1820,9 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontStencilFunc, SceGxmContext *context, Sce
         g_fileoffset += g_file.write(depthPass);
         g_fileoffset += g_file.write(compareMask);
         g_fileoffset += g_file.write(writeMask);
-        LOG("sceGxmSetFrontStencilFunc(context: %p, func: %" PRIu32 ", stencilFail: %" PRIu32 ", depthFail: %" PRIu32 ", depthPass: %" PRIu32 ", compareMask: %" PRIu8 ", writeMask: %" PRIu8 ")\n", context, func, stencilFail, depthFail, depthPass, compareMask, writeMask);
     }
 
+    LOGD("sceGxmSetFrontStencilFunc(context: %p, func: %" PRIu32 ", stencilFail: %" PRIu32 ", depthFail: %" PRIu32 ", depthPass: %" PRIu32 ", compareMask: %" PRIu8 ", writeMask: %" PRIu8 ")\n", context, func, stencilFail, depthFail, depthPass, compareMask, writeMask);
     TAI_NEXT(sceGxmSetFrontStencilFunc, sceGxmSetFrontStencilFuncRef, context, func, stencilFail, depthFail, depthPass, compareMask, writeMask);
 }
 
@@ -1834,9 +1836,9 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontStencilRef, SceGxmContext *context, unsi
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(sref);
-        LOG("sceGxmSetFrontStencilRef(context: %p, sref: %" PRIu32 ")\n", context, sref);
     }
 
+    LOGD("sceGxmSetFrontStencilRef(context: %p, sref: %" PRIu32 ")\n", context, sref);
     TAI_NEXT(sceGxmSetFrontStencilRef, sceGxmSetFrontStencilRefRef, context, sref);
 }
 
@@ -1895,9 +1897,9 @@ CREATE_PATCHED_CALL(int, sceGxmSetUniformDataF, void *uniformBuffer, const SceGx
         g_fileoffset += g_file.write(componentOffset);
         g_fileoffset += g_file.write(componentCount);
         g_fileoffset += g_file.write(sourceData);
-        LOG("sceGxmSetUniformDataF(uniformBuffer, %p, parameter: %p, componentOffset: %" PRIu32 ", componentCount: %" PRIu32 ", sourceData: %p)\n", uniformBuffer, parameter, componentOffset, componentCount, sourceData);
     }
 
+    LOGD("sceGxmSetUniformDataF(uniformBuffer, %p, parameter: %p, componentOffset: %" PRIu32 ", componentCount: %" PRIu32 ", sourceData: %p)\n", uniformBuffer, parameter, componentOffset, componentCount, sourceData);
     return TAI_NEXT(sceGxmSetUniformDataF, sceGxmSetUniformDataFRef, uniformBuffer, parameter, componentOffset, componentCount, sourceData);
 }
 
@@ -1930,9 +1932,9 @@ CREATE_PATCHED_CALL(void, sceGxmSetVertexProgram, SceGxmContext *context, const 
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(vertexProgram);
-        LOGD("sceGxmSetVertexProgram(context: %p, vertexProgram: %p)\n", context, vertexProgram);
     }
 
+    LOGD("sceGxmSetVertexProgram(context: %p, vertexProgram: %p)\n", context, vertexProgram);
     g_activeVertexProgram = vertexProgram;
 
     TAI_NEXT(sceGxmSetVertexProgram, sceGxmSetVertexProgramRef, context, vertexProgram);
@@ -1949,9 +1951,9 @@ CREATE_PATCHED_CALL(int, sceGxmSetVertexStream, SceGxmContext *context, unsigned
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(streamIndex);
         g_fileoffset += g_file.write(streamData);
-        LOGD("sceGxmSetVertexStream(context: %p, streamIndex: %" PRIu32 ", streamData: %p)\n", context, streamIndex, streamData);
     }
 
+    LOGD("sceGxmSetVertexStream(context: %p, streamIndex: %" PRIu32 ", streamData: %p)\n", context, streamIndex, streamData);
     g_activeVertexStreams[streamIndex] = streamData;
 
     return TAI_NEXT(sceGxmSetVertexStream, sceGxmSetVertexStreamRef, context, streamIndex, streamData);
@@ -2080,6 +2082,7 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherCreateMaskUpdateFragmentProgram, Sce
 CREATE_PATCHED_CALL(int, sceGxmShaderPatcherCreateVertexProgram, SceGxmShaderPatcher *shaderPatcher, SceGxmShaderPatcherId programId, const SceGxmVertexAttribute *attributes, unsigned int attributeCount, const SceGxmVertexStream *streams, unsigned int streamCount, SceGxmVertexProgram **vertexProgram)
 {
     int res = TAI_NEXT(sceGxmShaderPatcherCreateVertexProgram, sceGxmShaderPatcherCreateVertexProgramRef, shaderPatcher, programId, attributes, attributeCount, streams, streamCount, vertexProgram);
+    LOGD("sceGxmShaderPatcherCreateVertexProgram(shaderPatcher: %p, programId: %p, attributes: %p, attributeCount: %" PRIu32 ", streams: %p, streamCount: %" PRIu32 ", vertexProgram: %p)\n", shaderPatcher, programId, attributes, attributeCount, streams, streamCount, vertexProgram);
 
     if (vertexProgram) {
         GXMType type = GXMType::SceGxmVertexProgram;
@@ -2104,7 +2107,6 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherCreateVertexProgram, SceGxmShaderPat
         g_resource_manager.add(&vertexProg);
     }
 
-    LOGD("sceGxmShaderPatcherCreateVertexProgram(shaderPatcher: %p, programId: %p, attributes: %p, attributeCount: %" PRIu32 ", streams: %p, streamCount: %" PRIu32 ", vertexProgram: %p)\n", shaderPatcher, programId, attributes, attributeCount, streams, streamCount, vertexProgram);
     return res;
 }
 
@@ -2191,6 +2193,16 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherRegisterProgram, SceGxmShaderPatcher
         programRes.size += sizeof(uint32_t);
         programRes.program = programHeader;
         programRes.size += programRes.programLength;
+
+        uint32_t parameter_count = sceGxmProgramGetParameterCount(programHeader);
+        LOGD("Register program: parameter count %" PRIu32 "\n", parameter_count);
+
+        for (uint32_t parameter_index = 0; parameter_index < parameter_count; ++parameter_index) {
+            SceGxmProgramParameter const * parameter = sceGxmProgramGetParameter(programHeader, parameter_index);
+            char const* name = sceGxmProgramParameterGetName(parameter);
+            uint32_t resIndex = sceGxmProgramParameterGetResourceIndex(parameter);
+            LOGD("Parameter[%" PRIu32 "] name: %s, resource index: %" PRIu32 "\n", parameter_index, name, resIndex);
+        }
 
         g_resource_manager.add(&programRes);
     }
