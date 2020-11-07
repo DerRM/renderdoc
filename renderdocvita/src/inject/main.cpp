@@ -2043,7 +2043,7 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherCreateFragmentProgram, SceGxmShaderP
 {
     int res = TAI_NEXT(sceGxmShaderPatcherCreateFragmentProgram, sceGxmShaderPatcherCreateFragmentProgramRef, shaderPatcher, programId, outputFormat, multisampleMode, blendInfo, vertexProgram, fragmentProgram);
     
-    if (fragmentProgram) {
+    if (fragmentProgram && !g_resource_manager.contains((uint32_t)*fragmentProgram)) {
         GXMType type = GXMType::SceGxmFragmentProgram;
 
         FragmentProgramResource fragmentProg;
@@ -2069,7 +2069,7 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherCreateFragmentProgram, SceGxmShaderP
 
         g_resource_manager.add(&fragmentProg);
     }
-    LOGD("sceGxmShaderPatcherCreateFragmentProgram(shaderPatcher: %p, programId: %p, outputFormat: %" PRIu32 ", multisampleMode: %" PRIu32 ", blendInfo: %p, vertexProgram: %p, fragmentProgram: %p)\n", shaderPatcher, programId, outputFormat, multisampleMode, blendInfo, vertexProgram, fragmentProgram);
+    LOGD("sceGxmShaderPatcherCreateFragmentProgram(shaderPatcher: %p, programId: %p, outputFormat: %" PRIu32 ", multisampleMode: %" PRIu32 ", blendInfo: %p, vertexProgram: %p, fragmentProgram: %p)\n", shaderPatcher, programId, outputFormat, multisampleMode, blendInfo, vertexProgram, *fragmentProgram);
     return res;
 }
 
@@ -2082,9 +2082,8 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherCreateMaskUpdateFragmentProgram, Sce
 CREATE_PATCHED_CALL(int, sceGxmShaderPatcherCreateVertexProgram, SceGxmShaderPatcher *shaderPatcher, SceGxmShaderPatcherId programId, const SceGxmVertexAttribute *attributes, unsigned int attributeCount, const SceGxmVertexStream *streams, unsigned int streamCount, SceGxmVertexProgram **vertexProgram)
 {
     int res = TAI_NEXT(sceGxmShaderPatcherCreateVertexProgram, sceGxmShaderPatcherCreateVertexProgramRef, shaderPatcher, programId, attributes, attributeCount, streams, streamCount, vertexProgram);
-    LOGD("sceGxmShaderPatcherCreateVertexProgram(shaderPatcher: %p, programId: %p, attributes: %p, attributeCount: %" PRIu32 ", streams: %p, streamCount: %" PRIu32 ", vertexProgram: %p)\n", shaderPatcher, programId, attributes, attributeCount, streams, streamCount, vertexProgram);
 
-    if (vertexProgram) {
+    if (vertexProgram && !g_resource_manager.contains((uint32_t)*vertexProgram)) {
         GXMType type = GXMType::SceGxmVertexProgram;
         
         VertexProgramResource vertexProg;
@@ -2107,6 +2106,7 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherCreateVertexProgram, SceGxmShaderPat
         g_resource_manager.add(&vertexProg);
     }
 
+    LOGD("sceGxmShaderPatcherCreateVertexProgram(shaderPatcher: %p, programId: %p, attributes: %p, attributeCount: %" PRIu32 ", streams: %p, streamCount: %" PRIu32 ", vertexProgram: %p)\n", shaderPatcher, programId, attributes, attributeCount, streams, streamCount, *vertexProgram);
     return res;
 }
 
@@ -2176,7 +2176,7 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherRegisterProgram, SceGxmShaderPatcher
 {
     int res = TAI_NEXT(sceGxmShaderPatcherRegisterProgram, sceGxmShaderPatcherRegisterProgramRef, shaderPatcher, programHeader, programId);
 
-    if (programHeader) {
+    if (g_log && programHeader) {
         ++shadercount;
         ProgramHeader* header = (ProgramHeader*)programHeader;
         GXMType type = GXMType::SceGxmProgram;

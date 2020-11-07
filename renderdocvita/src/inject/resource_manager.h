@@ -93,6 +93,8 @@ inline FragmentProgramResource::FragmentProgramResource()
 {
 }
 
+#define MAX_KEY_COUNT 1024
+
 class ResourceManager {
 public:
     ResourceManager();
@@ -106,6 +108,8 @@ public:
 private:
     File m_file;
     uint32_t getFilePos(Resource* resource);
+    uint32_t m_cached_keys[MAX_KEY_COUNT] = { 0 };
+    uint32_t m_key_current_index = 0;
 };
 
 #endif

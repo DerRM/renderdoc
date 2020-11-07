@@ -26,7 +26,7 @@ uint32_t File::write(const void* data, uint32_t size) {
 
     int bytesWritten = 0;
     if ((bytesWritten = sceIoWrite(m_fd, data, size)) == 0) {
-        LOG("could not write to file: %s\n", m_path);
+        LOG("could not write to file: %s, size to write: %" PRIu32 "\n", m_path, size);
         return 0;
     }
 
@@ -41,7 +41,7 @@ uint32_t File::read(void* data, uint32_t size) {
 
     int bytesRead = 0;
     if ((bytesRead = sceIoRead(m_fd, data, size)) == 0) {
-        LOG("could not write to file: %s\n", m_path);
+        //LOG("could not read file: %s, size: %" PRIu32 "\n", m_path, size);
         return 0;
     }
 

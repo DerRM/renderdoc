@@ -72,6 +72,9 @@ void ResourceManager::insert(Resource* resource) {
 
 void ResourceManager::add(Resource* resource) {
 
+    m_cached_keys[m_key_current_index] = resource->id;
+    m_key_current_index = (m_key_current_index + 1) % MAX_KEY_COUNT;
+
     m_file.reopen();
 
     m_file.write(resource->type);
@@ -127,10 +130,33 @@ void ResourceManager::remove(Resource* resource) {
 }
 
 bool ResourceManager::contains(uint32_t key) {
-    /*Resource res = find(key);
-    if (res.id == key) {
-        return true;
-    }*/
+
+    for (uint32_t index = 0; index < MAX_KEY_COUNT; ++index) {
+        if (key == m_cached_keys[index]) {
+            return true;
+        }
+    }
+
+    m_file.reopen();
+
+    Resource resource;
+
+    while (true) {
+        uint32_t bytesread = m_file.read(resource);
+
+        if (bytesread == 0) {
+            break;
+        }
+
+        if (resource.id == key) {
+            m_file.close();
+            return true;
+        }
+
+        m_file.skip(resource.size);
+    }
+
+    m_file.close();
     return false;
 }
 
