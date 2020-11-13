@@ -22,8 +22,23 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
   SERIALISE_ELEMENT_TYPED(uint32_t, context);
   SERIALISE_ELEMENT_TYPED(uint32_t, primType);
   SERIALISE_ELEMENT_TYPED(uint32_t, indexType);
-  SERIALISE_ELEMENT_TYPED(uint32_t, indexData);
   SERIALISE_ELEMENT(indexCount);
+
+  uint32_t index_type_size = 0;
+
+  if(indexType == SCE_GXM_INDEX_FORMAT_U16)
+  {
+    index_type_size = 2;
+  }
+  else
+  {
+    index_type_size = 4;
+  }
+
+  uint32_t indexbufferSize = indexCount * index_type_size;
+
+  SERIALISE_ELEMENT_ARRAY(indexData, indexbufferSize);
+
   uint32_t streamCount;
   SERIALISE_ELEMENT(streamCount);
 

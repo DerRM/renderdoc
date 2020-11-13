@@ -1100,6 +1100,8 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
     int res = TAI_NEXT(sceGxmDraw, sceGxmDrawRef, context, primType, indexType, indexData, indexCount);
 
     if (g_log) {
+        const uint32_t ALIGNMENT = 64;
+        uint8_t alignmentBytes[ALIGNMENT] = { 0 };
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmDraw;
@@ -1108,7 +1110,6 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(primType);
         g_fileoffset += g_file.write(indexType);
-        g_fileoffset += g_file.write(indexData);
         g_fileoffset += g_file.write(indexCount);
 
         VertexProgramResource vertexRes;
@@ -1126,9 +1127,11 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
         }
 
         uint32_t max_index = 0;
+        uint32_t index_type_size = 0;
 
         switch(indexType) {
             case SCE_GXM_INDEX_FORMAT_U16: {
+                index_type_size = 2;
                 uint16_t* indices = (uint16_t*)indexData;
                 for (uint32_t index = 0; index < indexCount; ++index) {
                     if (max_index < indices[index]) {
@@ -1137,6 +1140,7 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
                 }
             } break;
             case SCE_GXM_INDEX_FORMAT_U32: {
+                index_type_size = 4;
                 uint32_t* indices = (uint32_t*)indexData;
                 for (uint32_t index = 0; index < indexCount; ++index) {
                     if (max_index < indices[index]) {
@@ -1148,6 +1152,13 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
         }
 
         LOGD("sceGxmDraw, max_index: %" PRIu32 "\n", max_index);
+
+        uint64_t indexbufferSize = indexCount * index_type_size;
+        g_fileoffset += g_file.write(indexbufferSize);
+
+        uint32_t fillbyteSize = (ALIGNMENT - (g_fileoffset % ALIGNMENT)) % ALIGNMENT;
+        g_fileoffset += g_file.write(alignmentBytes, fillbyteSize);
+        g_fileoffset += g_file.write(indexData, indexbufferSize);
 
         //ProgramResource programRes;
         //g_resource_manager.find(GXMType::SceGxmProgram, (uint32_t)vertexRes.programId, &programRes);
@@ -1162,9 +1173,8 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
             uint32_t vertexBufferSize = (max_index + 1) * vertexRes.streams[stream_index].stride;
             g_fileoffset += g_file.write(vertexBufferSize);
             g_fileoffset += g_file.write((uint64_t)vertexBufferSize);
-            const uint32_t ALIGNMENT = 64;
-            uint8_t alignmentBytes[ALIGNMENT] = { 0 };
-            uint32_t fillbyteSize = ALIGNMENT - (g_fileoffset % ALIGNMENT);
+
+            fillbyteSize = (ALIGNMENT - (g_fileoffset % ALIGNMENT)) % ALIGNMENT;
             LOGD("sceGxmDraw: fillbytes: %" PRIu32 "\n", fillbyteSize);
             g_fileoffset += g_file.write(alignmentBytes, fillbyteSize);
             g_fileoffset += g_file.write(g_activeVertexStreams[vertexRes.streams[stream_index].indexSource], vertexBufferSize);
