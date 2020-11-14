@@ -90,6 +90,12 @@ uint32_t g_displayWaitCount = 0;
 const SceGxmVertexProgram * g_activeVertexProgram = NULL;
 const void * g_activeVertexStreams[SCE_GXM_MAX_VERTEX_STREAMS] = { NULL };
 
+const uint32_t ALIGNMENT = 64;
+const uint8_t g_alignmentBytes[ALIGNMENT] = { 0 };
+
+#define ALIGN_TO_64(bytes) \
+    g_file.write(g_alignmentBytes, (ALIGNMENT - ((bytes) % ALIGNMENT)) % ALIGNMENT);
+
 #define PRINT_LOG
 
 #undef LOGD
@@ -746,6 +752,8 @@ CREATE_PATCHED_CALL(int, sceGxmBeginScene, SceGxmContext *context, unsigned int 
         g_fileoffset += g_file.write(fragmentSyncObject);
         g_fileoffset += g_file.write(colorSurface);
         g_fileoffset += g_file.write(depthStencil);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmBeginScene(context: %p, flags: %d, rendertarget: %p, validRegion: %p, vertexSyncObject: %p, fragmentSyncObject: %p, colorSurface: %p, depthStencil: %p)\n", context, flags, renderTarget, validRegion, vertexSyncObject, fragmentSyncObject, colorSurface, depthStencil);
@@ -1004,6 +1012,8 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
         g_fileoffset += g_file.write(oldBuffer);
         g_fileoffset += g_file.write(newBuffer);
         g_fileoffset += g_file.write(callbackData);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
     LOGD("sceGxmDisplayQueueAddEntry(oldBuffer: %p, newBuffer: %p, callbackData: %p)\n", oldBuffer, newBuffer, callbackData);
 
@@ -1100,8 +1110,6 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
     int res = TAI_NEXT(sceGxmDraw, sceGxmDrawRef, context, primType, indexType, indexData, indexCount);
 
     if (g_log) {
-        const uint32_t ALIGNMENT = 64;
-        uint8_t alignmentBytes[ALIGNMENT] = { 0 };
         uint32_t chunkSize = 0;
 
         GXMChunk type = GXMChunk::sceGxmDraw;
@@ -1156,8 +1164,7 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
         uint64_t indexbufferSize = indexCount * index_type_size;
         g_fileoffset += g_file.write(indexbufferSize);
 
-        uint32_t fillbyteSize = (ALIGNMENT - (g_fileoffset % ALIGNMENT)) % ALIGNMENT;
-        g_fileoffset += g_file.write(alignmentBytes, fillbyteSize);
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
         g_fileoffset += g_file.write(indexData, indexbufferSize);
 
         //ProgramResource programRes;
@@ -1174,12 +1181,11 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
             g_fileoffset += g_file.write(vertexBufferSize);
             g_fileoffset += g_file.write((uint64_t)vertexBufferSize);
 
-            fillbyteSize = (ALIGNMENT - (g_fileoffset % ALIGNMENT)) % ALIGNMENT;
-            LOGD("sceGxmDraw: fillbytes: %" PRIu32 "\n", fillbyteSize);
-            g_fileoffset += g_file.write(alignmentBytes, fillbyteSize);
+            g_fileoffset += ALIGN_TO_64(g_fileoffset);
             g_fileoffset += g_file.write(g_activeVertexStreams[vertexRes.streams[stream_index].indexSource], vertexBufferSize);
         }
 
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     return res;
@@ -1215,6 +1221,8 @@ CREATE_PATCHED_CALL(int, sceGxmEndScene, SceGxmContext *context, const SceGxmNot
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(vertexNotification);
         g_fileoffset += g_file.write(fragmentNotification);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmEndScene(context: %p, flags: %" PRIu32 ", vertexNotification: %p, fragmentNotification: %p)\n", context, vertexNotification, fragmentNotification);
@@ -1403,6 +1411,8 @@ CREATE_PATCHED_CALL(int, sceGxmPadHeartbeat, const SceGxmColorSurface *displaySu
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(displaySurface);
         g_fileoffset += g_file.write(displaySyncObject);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmPadHeartbeat(displaySurface: %p, displaySyncObject: %p)\n", displaySurface, displaySyncObject);
@@ -1577,6 +1587,8 @@ CREATE_PATCHED_CALL(int, sceGxmReserveFragmentDefaultUniformBuffer, SceGxmContex
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(uniformBuffer);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmReserveFragmentDefaultUniformBuffer(context: %p, uniformBuffer: %p)\n", context, uniformBuffer);
@@ -1593,6 +1605,8 @@ CREATE_PATCHED_CALL(int, sceGxmReserveVertexDefaultUniformBuffer, SceGxmContext 
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(uniformBuffer);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmReserveVertexDefaultUniformBuffer(context: %p, uniformBuffer: %p)\n", context, uniformBuffer);
@@ -1728,6 +1742,8 @@ CREATE_PATCHED_CALL(void, sceGxmSetFragmentProgram, SceGxmContext *context, cons
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(fragmentProgram);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmSetFragmentProgram(context: %p, fragmentProgram: %p)\n", context, fragmentProgram);
@@ -1768,6 +1784,8 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontDepthFunc, SceGxmContext *context, SceGx
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(depthFunc);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmSetFrontDepthFunc(context: %p, depthFunc: %" PRIu32 ")\n", context, depthFunc);
@@ -1785,6 +1803,7 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontDepthWriteEnable, SceGxmContext *context
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(enable);
 
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmSetFrontDepthWriteEnable(context: %p, enable: %" PRIu32 ")\n", context, enable);
@@ -1824,12 +1843,14 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontStencilFunc, SceGxmContext *context, Sce
         g_fileoffset += g_file.write(type);
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
-        g_fileoffset += g_file.write(func);
-        g_fileoffset += g_file.write(stencilFail);
-        g_fileoffset += g_file.write(depthFail);
-        g_fileoffset += g_file.write(depthPass);
+        g_fileoffset += g_file.write((uint32_t)func);
+        g_fileoffset += g_file.write((uint32_t)stencilFail);
+        g_fileoffset += g_file.write((uint32_t)depthFail);
+        g_fileoffset += g_file.write((uint32_t)depthPass);
         g_fileoffset += g_file.write(compareMask);
         g_fileoffset += g_file.write(writeMask);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmSetFrontStencilFunc(context: %p, func: %" PRIu32 ", stencilFail: %" PRIu32 ", depthFail: %" PRIu32 ", depthPass: %" PRIu32 ", compareMask: %" PRIu8 ", writeMask: %" PRIu8 ")\n", context, func, stencilFail, depthFail, depthPass, compareMask, writeMask);
@@ -1846,6 +1867,8 @@ CREATE_PATCHED_CALL(void, sceGxmSetFrontStencilRef, SceGxmContext *context, unsi
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(sref);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmSetFrontStencilRef(context: %p, sref: %" PRIu32 ")\n", context, sref);
@@ -1907,6 +1930,8 @@ CREATE_PATCHED_CALL(int, sceGxmSetUniformDataF, void *uniformBuffer, const SceGx
         g_fileoffset += g_file.write(componentOffset);
         g_fileoffset += g_file.write(componentCount);
         g_fileoffset += g_file.write(sourceData);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmSetUniformDataF(uniformBuffer, %p, parameter: %p, componentOffset: %" PRIu32 ", componentCount: %" PRIu32 ", sourceData: %p)\n", uniformBuffer, parameter, componentOffset, componentCount, sourceData);
@@ -1942,6 +1967,8 @@ CREATE_PATCHED_CALL(void, sceGxmSetVertexProgram, SceGxmContext *context, const 
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(vertexProgram);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmSetVertexProgram(context: %p, vertexProgram: %p)\n", context, vertexProgram);
@@ -1961,6 +1988,8 @@ CREATE_PATCHED_CALL(int, sceGxmSetVertexStream, SceGxmContext *context, unsigned
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(streamIndex);
         g_fileoffset += g_file.write(streamData);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmSetVertexStream(context: %p, streamIndex: %" PRIu32 ", streamData: %p)\n", context, streamIndex, streamData);

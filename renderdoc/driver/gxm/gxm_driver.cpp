@@ -40,6 +40,14 @@ bool WrappedGXM::DiscardFrameCapture(void *dev, void *wnd)
   return false;
 }
 
+rdcstr WrappedGXM::GetChunkName(uint32_t idx)
+{
+  if((SystemChunk)idx < SystemChunk::FirstDriverChunk)
+    return ToStr((SystemChunk)idx);
+
+  return ToStr((GXMChunk)idx);
+}
+
 ReplayStatus WrappedGXM::ReadLogInitialisation(RDCFile *rdc, bool storeStructuredBuffers)
 {
   int sectionIdx = rdc->SectionIndex(SectionType::FrameCapture);
@@ -57,18 +65,45 @@ ReplayStatus WrappedGXM::ReadLogInitialisation(RDCFile *rdc, bool storeStructure
 
   ReadSerialiser ser(reader, Ownership::Stream);
 
+  ser.ConfigureStructuredExport(&GetChunkName, storeStructuredBuffers);
+
+  m_StructuredFile = &ser.GetStructuredFile();
+
   for(;;)
   {
+    m_CurChunkOffset = ser.GetReader()->GetOffset();
+
     GXMChunk context = ser.ReadChunk<GXMChunk>();
 
+    if(ser.GetReader()->IsErrored())
+      return ReplayStatus::APIDataCorrupted;
+
+    m_ChunkMetadata = ser.ChunkMetadata();
+
     bool success = ProcessChunk(ser, context);
+
+    ser.EndChunk();
+
+    if(ser.GetReader()->IsErrored())
+      return ReplayStatus::APIDataCorrupted;
 
     if(!success)
       return ReplayStatus::APIReplayFailed;
 
+    if(!m_AddedDrawcall)
+      AddEvent();
+
+    m_AddedDrawcall = false;
+
     if((SystemChunk)context == SystemChunk::CaptureScope || reader->IsErrored() || reader->AtEnd())
       break;
+
+    m_CurEventID++;
   }
+
+  m_StructuredFile->Swap(m_StoredStructuredData);
+
+  m_StructuredFile = &m_StoredStructuredData;
 
   m_Replay->WriteFrameRecord().drawcallList = m_Drawcalls;
 
@@ -77,11 +112,43 @@ ReplayStatus WrappedGXM::ReadLogInitialisation(RDCFile *rdc, bool storeStructure
 
 void WrappedGXM::AddDrawcall(const DrawcallDescription &d) 
 {
-  m_Drawcalls.push_back(d);
+  m_AddedDrawcall = true;
+
+  DrawcallDescription draw = d;
+  draw.eventId = m_CurEventID;
+  draw.drawcallId = m_CurDrawcallID;
+
+  m_CurDrawcallID++;
+
+  draw.events = m_CurEvents;
+  m_CurEvents.clear();
+
+  m_Drawcalls.push_back(draw);
+}
+
+void WrappedGXM::AddEvent()
+{
+  APIEvent apievent;
+
+  apievent.fileOffset = m_CurChunkOffset;
+  apievent.eventId = m_CurEventID;
+  
+  apievent.chunkIndex = uint32_t(m_StructuredFile->chunks.size() - 1);
+  apievent.callstack = m_ChunkMetadata.callstack;
+
+  m_CurEvents.push_back(apievent);
+
+  if (IsLoading(m_State))
+  {
+    m_Events.resize(apievent.eventId + 1);
+    m_Events[apievent.eventId] = apievent;
+  }
 }
 
 bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
 {
+  m_AddedDrawcall = false;
+
   switch(chunk)
   {
     case GXMChunk::DeviceInitialisation: break;
@@ -372,6 +439,7 @@ bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
     case GXMChunk::Max: break;
     default: break;
   }
+
   return false;
 }
 
@@ -389,6 +457,11 @@ WrappedGXM::WrappedGXM()
   }
 
   m_CurEventID = 0;
+  m_CurDrawcallID = 0;
+  m_CurChunkOffset = 0;
+
+  m_StructuredFile = &m_StoredStructuredData;
+  m_AddedDrawcall = false;
 }
 
 WrappedGXM::~WrappedGXM() 

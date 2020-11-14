@@ -228,7 +228,6 @@ public:
   };
 
 private:
-  SDFile m_file;
   WrappedGXM *m_pDriver;
   FrameRecord m_FrameRecord;
   uint64_t m_OutputWinID;

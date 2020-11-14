@@ -20,8 +20,8 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
                                       const void *indexData, unsigned int indexCount)
 {
   SERIALISE_ELEMENT_TYPED(uint32_t, context);
-  SERIALISE_ELEMENT_TYPED(uint32_t, primType);
-  SERIALISE_ELEMENT_TYPED(uint32_t, indexType);
+  SERIALISE_ELEMENT(primType);
+  SERIALISE_ELEMENT(indexType);
   SERIALISE_ELEMENT(indexCount);
 
   uint32_t index_type_size = 0;
@@ -60,6 +60,8 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
   {
     if (IsLoading(m_State))
     {
+      AddEvent();
+
       uint32_t IdxSize = GetIdxSize(indexType);
 
       DrawcallDescription draw;

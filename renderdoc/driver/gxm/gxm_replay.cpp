@@ -38,7 +38,7 @@ void GXMReplay::ReplayLog(uint32_t endEventID, ReplayLogType replayType) {}
 
 const SDFile &GXMReplay::GetStructuredFile()
 {
-  return m_file;
+  return m_pDriver->GetStructuredFile();
 }
 
 rdcarray<uint32_t> GXMReplay::GetPassEvents(uint32_t eventId)

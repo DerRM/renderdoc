@@ -41,7 +41,13 @@ private:
   CaptureState m_State;
   GXMReplay *m_Replay = NULL;
   rdcarray<DrawcallDescription> m_Drawcalls;
-  uint32_t m_CurEventID;
+  uint32_t m_CurEventID, m_CurDrawcallID;
+  rdcarray<APIEvent> m_CurEvents, m_Events;
+  uint64_t m_CurChunkOffset;
+  SDChunkMetaData m_ChunkMetadata;
+  SDFile *m_StructuredFile;
+  SDFile m_StoredStructuredData;
+  bool m_AddedDrawcall;
 
 public:
 
@@ -57,8 +63,11 @@ public:
   bool EndFrameCapture(void *dev, void *wnd);
   bool DiscardFrameCapture(void *dev, void *wnd);
   ReplayStatus ReadLogInitialisation(RDCFile *rdc, bool storeStructuredBuffers);
+  static rdcstr GetChunkName(uint32_t idx);
+  SDFile &GetStructuredFile() { return *m_StructuredFile; }
 
 private:
+  void AddEvent();
   void AddDrawcall(const DrawcallDescription &d);
   bool ProcessChunk(ReadSerialiser &ser, GXMChunk chunk);
 

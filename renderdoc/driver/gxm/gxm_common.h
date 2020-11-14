@@ -29,6 +29,8 @@
 #include "core/core.h"
 #include "maths/vec.h"
 
+#include "gxm_enum.h"
+
 #include "official/gxm.h"
 
 #include "gxm_types.h"
@@ -44,3 +46,9 @@
 
 Topology MakePrimitiveTopology(SceGxmPrimitiveType Topo);
 
+DECLARE_REFLECTION_ENUM(SceGxmIndexFormat);
+DECLARE_REFLECTION_ENUM(SceGxmPrimitiveType);
+DECLARE_REFLECTION_ENUM(SceGxmDepthFunc);
+DECLARE_REFLECTION_ENUM(SceGxmStencilFunc);
+DECLARE_REFLECTION_ENUM(SceGxmStencilOp);
+DECLARE_REFLECTION_ENUM(SceGxmDepthWriteMode);

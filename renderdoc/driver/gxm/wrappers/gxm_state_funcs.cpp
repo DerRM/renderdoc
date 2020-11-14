@@ -68,10 +68,10 @@ bool WrappedGXM::Serialise_sceGxmSetFrontStencilFunc(
     unsigned char compareMask, unsigned char writeMask)
 {
   SERIALISE_ELEMENT_TYPED(uint32_t, context);
-  SERIALISE_ELEMENT_TYPED(uint32_t, func);
-  SERIALISE_ELEMENT_TYPED(uint8_t, stencilFail);
-  SERIALISE_ELEMENT_TYPED(uint8_t, depthFail);
-  SERIALISE_ELEMENT_TYPED(uint8_t, depthPass);
+  SERIALISE_ELEMENT(func);
+  SERIALISE_ELEMENT(stencilFail);
+  SERIALISE_ELEMENT(depthFail);
+  SERIALISE_ELEMENT(depthPass);
   SERIALISE_ELEMENT(compareMask);
   SERIALISE_ELEMENT(writeMask);
 
@@ -88,7 +88,7 @@ bool WrappedGXM::Serialise_sceGxmSetFrontDepthWriteEnable(SerialiserType &ser, S
                                                           SceGxmDepthWriteMode enable)
 {
   SERIALISE_ELEMENT_TYPED(uint32_t, context);
-  SERIALISE_ELEMENT_TYPED(uint32_t, enable);
+  SERIALISE_ELEMENT(enable);
 
   RDCLOG("sceGxmSetFrontDepthWriteEnable(context: 0x%x, enable: %" PRIu32 ")", context, enable);
 
@@ -159,7 +159,7 @@ bool WrappedGXM::Serialise_sceGxmSetFrontDepthFunc(SerialiserType &ser, SceGxmCo
   SceGxmDepthFunc depthFunc)
 {
   SERIALISE_ELEMENT_TYPED(uint32_t, context);
-  SERIALISE_ELEMENT_TYPED(uint32_t, depthFunc);
+  SERIALISE_ELEMENT(depthFunc);
 
   RDCLOG("sceGxmSetFrontDepthFunc(context: 0x%x, depthFunc: %" PRIu32 ")", context, depthFunc);
 
