@@ -47,6 +47,12 @@
     <ClInclude Include="gxm_enum.h">
       <Filter>Util</Filter>
     </ClInclude>
+    <ClInclude Include="gxm_manager.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="gxm_initstate.h">
+      <Filter>Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gxm_driver.cpp">
@@ -77,6 +83,12 @@
       <Filter>Util</Filter>
     </ClCompile>
     <ClCompile Include="gxm_stringise.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="gxm_manager.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="gxm_initstate.cpp">
       <Filter>Util</Filter>
     </ClCompile>
   </ItemGroup>

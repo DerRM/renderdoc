@@ -27,3 +27,74 @@
 
 #include "core/resource_manager.h"
 #include "gxm_common.h"
+
+enum NullInitialiser
+{
+  MakeNullResource
+};
+
+enum GXMNamespace
+{
+  eResUnknown = 0,
+  eResTexture,
+  eResFramebuffer,
+  eResBuffer,
+  eResShader,
+  eResProgram,
+};
+
+struct GXMResource
+{
+  GXMResource()
+  {
+    Namespace = eResUnknown;
+  }
+  GXMResource(NullInitialiser)
+  {
+    Namespace = eResUnknown;
+  }
+  GXMResource(GXMNamespace n)
+  {
+    Namespace = n;
+  }
+
+  GXMNamespace Namespace;
+
+  bool operator==(const GXMResource &o) const
+  {
+    return Namespace == o.Namespace;
+  }
+
+  bool operator!=(const GXMResource &o) const { return !(*this == o); }
+  bool operator<(const GXMResource &o) const
+  {
+    //if(Namespace != o.Namespace)
+      return Namespace < o.Namespace;
+  }
+};
+
+inline GXMResource TextureRes()
+{
+  return GXMResource(eResTexture);
+}
+inline GXMResource FramebufferRes()
+{
+  return GXMResource(eResFramebuffer);
+}
+inline GXMResource BufferRes()
+{
+  return GXMResource(eResBuffer);
+}
+inline GXMResource ShaderRes()
+{
+  return GXMResource(eResShader);
+}
+inline GXMResource ProgramRes()
+{
+  return GXMResource(eResProgram);
+}
+
+struct GXMResourceRecord : public ResourceRecord
+{
+  static const NullInitialiser NullResource = MakeNullResource;
+};

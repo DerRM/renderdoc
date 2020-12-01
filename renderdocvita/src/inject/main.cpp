@@ -4,6 +4,8 @@
 
 ResourceManager g_resource_manager;
 
+#include <atomic>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -76,6 +78,7 @@ int g_capture = 0;
 int g_log = 0;
 int g_log_display = 0;
 File g_file;
+std::atomic<int64_t> g_resourceid;
 
 uint64_t g_fileoffset = 0;
 void* g_framebuffers[64] = {};
@@ -86,6 +89,8 @@ void* g_baseFrame;
 uint32_t g_frameCount = 0;
 uint32_t g_logFrameCount = 0;
 uint32_t g_displayWaitCount = 0;
+
+SceDisplayFrameBuf g_framebuffer;
 
 const SceGxmVertexProgram * g_activeVertexProgram = NULL;
 const void * g_activeVertexStreams[SCE_GXM_MAX_VERTEX_STREAMS] = { NULL };
@@ -253,6 +258,14 @@ static int sceDisplaySetFrameBufPatched(SceDisplayFrameBuf* frameBuf, SceDisplay
 
         g_log_display = 0;
     }
+
+    if (frameBuf) {
+        g_framebuffer = *frameBuf;
+    }
+    else {
+        memset(&g_framebuffer, 0, sizeof(SceDisplayFrameBuf));
+    }
+    
 
     return TAI_NEXT(sceDisplaySetFrameBuf, sceDisplaySetFrameBufRef, frameBuf, bufSync);
 }
@@ -1045,6 +1058,10 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
     }
 
     if (g_capture) {
+        // clear all display queue calls to make sure the current 
+        // framebuffer is really the one we currently have rendered to
+        sceGxmDisplayQueueFinish();
+
         g_capture = 0;
 
         g_log = 1;
@@ -1090,6 +1107,19 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
 
         g_file.write(&section, offsetof(struct BinarySectionHeader, name));
         g_file.write("FrameCapture", section.sectionNameLength);
+
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::ContextConfiguration;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(g_framebuffer.base);
+        g_fileoffset += g_file.write(g_framebuffer.width);
+        g_fileoffset += g_file.write(g_framebuffer.height);
+        g_fileoffset += g_file.write(g_framebuffer.pitch);
+        g_fileoffset += g_file.write(g_framebuffer.pixelformat);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     ++g_frameCount;
@@ -3164,6 +3194,8 @@ int module_start(SceSize args, void *argp) {
     File file;
     file.open("ux0:/data/renderdoc/resources.bin");
     g_resource_manager.init(file);
+
+    g_resourceid = 1;
 
     /*
     kuIoRemove("ux0:/data/renderdoc/test");

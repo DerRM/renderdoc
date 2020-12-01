@@ -147,6 +147,16 @@ bool WrappedGXM::Serialise_sceGxmDisplayQueueAddEntry(SerialiserType &ser,
   SERIALISE_ELEMENT_TYPED(uint32_t, newBuffer);
   SERIALISE_ELEMENT_TYPED(uint32_t, callbackData);
 
+  if(IsLoading(m_State))
+  {
+    AddEvent();
+
+    DrawcallDescription draw;
+    draw.name = "End of Capture";
+    draw.flags |= DrawFlags::Present;
+
+    AddDrawcall(draw);
+  }
 
   RDCLOG("sceGxmDisplayQueueAddEntry(oldBuffer: 0x%x, newBuffer: 0x%x, callbackData: 0x%x)",
          oldBuffer, newBuffer, callbackData);
@@ -156,7 +166,7 @@ bool WrappedGXM::Serialise_sceGxmDisplayQueueAddEntry(SerialiserType &ser,
 
 template <typename SerialiserType>
 bool WrappedGXM::Serialise_sceGxmSetFrontDepthFunc(SerialiserType &ser, SceGxmContext *context,
-  SceGxmDepthFunc depthFunc)
+                                                   SceGxmDepthFunc depthFunc)
 {
   SERIALISE_ELEMENT_TYPED(uint32_t, context);
   SERIALISE_ELEMENT(depthFunc);
@@ -194,4 +204,4 @@ INSTANTIATE_FUNCTION_SERIALISED(int, sceGxmPadHeartbeat, const SceGxmColorSurfac
 INSTANTIATE_FUNCTION_SERIALISED(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer,
                                 SceGxmSyncObject *newBuffer, const void *callbackData);
 INSTANTIATE_FUNCTION_SERIALISED(void, sceGxmSetFrontDepthFunc, SceGxmContext *context,
-                              SceGxmDepthFunc depthFunc);
+                                SceGxmDepthFunc depthFunc);

@@ -155,6 +155,8 @@
     <ClInclude Include="gxm_common.h" />
     <ClInclude Include="gxm_driver.h" />
     <ClInclude Include="gxm_enum.h" />
+    <ClInclude Include="gxm_initstate.h" />
+    <ClInclude Include="gxm_manager.h" />
     <ClInclude Include="gxm_replay.h" />
     <ClInclude Include="gxm_resources.h" />
     <ClInclude Include="gxm_types.h" />
@@ -165,6 +167,8 @@
   <ItemGroup>
     <ClCompile Include="gxm_common.cpp" />
     <ClCompile Include="gxm_driver.cpp" />
+    <ClCompile Include="gxm_initstate.cpp" />
+    <ClCompile Include="gxm_manager.cpp" />
     <ClCompile Include="gxm_replay.cpp" />
     <ClCompile Include="gxm_stringise.cpp" />
     <ClCompile Include="gxm_types.cpp" />

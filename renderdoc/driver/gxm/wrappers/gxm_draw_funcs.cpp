@@ -53,12 +53,12 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
   SERIALISE_CHECK_READ_ERRORS();
 
   RDCLOG("sceGxmDraw(context: 0x%x, primType: %" PRIu32 ", indexType: %" PRIu32
-      ", indexData: 0x%x, indexCount: %" PRIu32 ")",
-      context, primType, indexType, indexData, indexCount);
+         ", indexData: 0x%x, indexCount: %" PRIu32 ")",
+         context, primType, indexType, indexData, indexCount);
 
   if(ser.IsReading() && IsReplayMode(m_State))
   {
-    if (IsLoading(m_State))
+    if(IsLoading(m_State))
     {
       AddEvent();
 
@@ -79,8 +79,6 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
       draw.eventId = m_CurEventID;
 
       AddDrawcall(draw);
-
-      m_CurEventID++;
     }
   }
 

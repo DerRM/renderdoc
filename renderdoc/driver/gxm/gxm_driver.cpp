@@ -105,7 +105,7 @@ ReplayStatus WrappedGXM::ReadLogInitialisation(RDCFile *rdc, bool storeStructure
 
   m_StructuredFile = &m_StoredStructuredData;
 
-  m_Replay->WriteFrameRecord().drawcallList = m_Drawcalls;
+  m_Replay->WriteFrameRecord().drawcallList = m_ParentDrawcall.children;
 
   return ReplayStatus::Succeeded;
 }
@@ -118,12 +118,18 @@ void WrappedGXM::AddDrawcall(const DrawcallDescription &d)
   draw.eventId = m_CurEventID;
   draw.drawcallId = m_CurDrawcallID;
 
+  {
+    RDCEraseEl(draw.outputs);
+
+    draw.outputs[0] = GetResourceManager()->GetOriginalID(GetResourceManager()->GetID(FramebufferRes()));
+  }
+
   m_CurDrawcallID++;
 
   draw.events = m_CurEvents;
   m_CurEvents.clear();
 
-  m_Drawcalls.push_back(draw);
+  m_DrawcallStack.back()->children.push_back(draw);
 }
 
 void WrappedGXM::AddEvent()
@@ -144,6 +150,24 @@ void WrappedGXM::AddEvent()
     m_Events[apievent.eventId] = apievent;
   }
 }
+
+template <typename SerialiserType>
+bool WrappedGXM::Serialise_ContextConfiguration(SerialiserType &ser, void *ctx)
+{
+  uint32_t base;
+  SERIALISE_ELEMENT(base);
+  
+  GXMInitParams params = {};
+  SERIALISE_ELEMENT(params.width);
+  SERIALISE_ELEMENT(params.height);
+  SERIALISE_ELEMENT(params.pitch);
+  SERIALISE_ELEMENT(params.pixelformat);
+
+  (void)params;
+
+  return true;
+}
+
 
 bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
 {
@@ -436,6 +460,7 @@ bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
     case GXMChunk::sceGxmVertexFence: break;
     case GXMChunk::sceGxmVertexProgramGetProgram: break;
     case GXMChunk::sceGxmWaitEvent: break;
+    case GXMChunk::ContextConfiguration: return Serialise_ContextConfiguration(ser, NULL);
     case GXMChunk::Max: break;
     default: break;
   }
@@ -462,6 +487,12 @@ WrappedGXM::WrappedGXM()
 
   m_StructuredFile = &m_StoredStructuredData;
   m_AddedDrawcall = false;
+
+  m_DrawcallStack.push_back(&m_ParentDrawcall);
+
+  CaptureState state = CaptureState::LoadingReplaying;
+
+  m_ResourceManager = new GXMResourceManager(state);
 }
 
 WrappedGXM::~WrappedGXM() 

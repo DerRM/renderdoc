@@ -266,6 +266,7 @@
   FUNC(sceGxmVertexFence, sceGxmVertexFence) \
   FUNC(sceGxmVertexProgramGetProgram, sceGxmVertexProgramGetProgram) \
   FUNC(sceGxmWaitEvent, sceGxmWaitEvent) \
+  FUNC(ContextConfiguration, ContextConfiguration) \
 
 
 template <>

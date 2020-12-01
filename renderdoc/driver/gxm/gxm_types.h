@@ -276,6 +276,9 @@ enum class GXMChunk : uint32_t
   sceGxmVertexFence,
   sceGxmVertexProgramGetProgram,
   sceGxmWaitEvent,
+
+  ContextConfiguration,
+
   Max,
 };
 

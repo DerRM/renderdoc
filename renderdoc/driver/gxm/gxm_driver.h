@@ -28,9 +28,19 @@
 #include "common/common.h"
 #include "core/core.h"
 #include "gxm_common.h"
+#include "gxm_manager.h"
 #include "gxm_resources.h"
 
 class GXMReplay;
+
+struct GXMInitParams
+{
+  uint32_t width;
+  uint32_t height;
+  uint32_t pitch;
+  uint32_t size;
+  uint32_t pixelformat;
+};
 
 class WrappedGXM : public IFrameCapturer
 {
@@ -40,7 +50,7 @@ private:
 
   CaptureState m_State;
   GXMReplay *m_Replay = NULL;
-  rdcarray<DrawcallDescription> m_Drawcalls;
+  rdcarray<DrawcallDescription *> m_DrawcallStack;
   uint32_t m_CurEventID, m_CurDrawcallID;
   rdcarray<APIEvent> m_CurEvents, m_Events;
   uint64_t m_CurChunkOffset;
@@ -48,12 +58,15 @@ private:
   SDFile *m_StructuredFile;
   SDFile m_StoredStructuredData;
   bool m_AddedDrawcall;
+  DrawcallDescription m_ParentDrawcall;
+  GXMResourceManager *m_ResourceManager;
 
 public:
 
   WrappedGXM();
   virtual ~WrappedGXM();
 
+  GXMResourceManager *GetResourceManager() { return m_ResourceManager; }
   GXMReplay *GetReplay() { return m_Replay; }
 
   void SetDriverType(RDCDriver type) { m_DriverType = type; }
@@ -65,11 +78,15 @@ public:
   ReplayStatus ReadLogInitialisation(RDCFile *rdc, bool storeStructuredBuffers);
   static rdcstr GetChunkName(uint32_t idx);
   SDFile &GetStructuredFile() { return *m_StructuredFile; }
+  const DrawcallDescription &GetRootDraw() { return m_ParentDrawcall; }
 
 private:
   void AddEvent();
   void AddDrawcall(const DrawcallDescription &d);
   bool ProcessChunk(ReadSerialiser &ser, GXMChunk chunk);
+
+  template <typename SerialiserType>
+  bool Serialise_ContextConfiguration(SerialiserType &ser, void *ctx);
 
 public:
 
