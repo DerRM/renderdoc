@@ -39,7 +39,7 @@ struct GXMInitParams
   uint32_t height;
   uint32_t pitch;
   uint32_t size;
-  uint32_t pixelformat;
+  SceDisplayPixelFormat pixelformat;
 };
 
 class WrappedGXM : public IFrameCapturer
@@ -60,12 +60,21 @@ private:
   bool m_AddedDrawcall;
   DrawcallDescription m_ParentDrawcall;
   GXMResourceManager *m_ResourceManager;
-
 public:
+  struct VulkanState
+  {
+    VkInstance m_Instance;
+    VkPhysicalDevice m_Gpu;
+    VkDevice m_Device;
+    uint32_t m_QueueFamilyIndex;
+    VkQueue m_Queue;
+    VkDebugUtilsMessengerEXT m_DbgUtilsCallback;
+  };
 
   WrappedGXM();
   virtual ~WrappedGXM();
 
+  ReplayStatus Initialise();
   GXMResourceManager *GetResourceManager() { return m_ResourceManager; }
   GXMReplay *GetReplay() { return m_Replay; }
 
@@ -80,16 +89,88 @@ public:
   SDFile &GetStructuredFile() { return *m_StructuredFile; }
   const DrawcallDescription &GetRootDraw() { return m_ParentDrawcall; }
 
+  VulkanState &GetVulkanState() { return m_vulkanState; }
+  uint32_t WrappedGXM::GetReadbackMemoryIndex(uint32_t resourceRequiredBitmask);
+  uint32_t WrappedGXM::GetUploadMemoryIndex(uint32_t resourceRequiredBitmask);
+  uint32_t WrappedGXM::GetGPULocalMemoryIndex(uint32_t resourceRequiredBitmask);
+  VkCommandBuffer GetNextCmd();
+  void WrappedGXM::SubmitCmds();
+  void WrappedGXM::FlushQ();
+  GXMVkCreationInfo m_CreationInfo;
+
+  struct
+  {
+    void Reset()
+    {
+      cmdpool = VK_NULL_HANDLE;
+      freecmds.clear();
+      pendingcmds.clear();
+      submittedcmds.clear();
+
+      freesems.clear();
+      pendingsems.clear();
+      submittedsems.clear();
+    }
+
+    VkCommandPool cmdpool;    // the command pool used for allocating our own command buffers
+
+    rdcarray<VkCommandBuffer> freecmds;
+    // -> GetNextCmd() ->
+    rdcarray<VkCommandBuffer> pendingcmds;
+    // -> SubmitCmds() ->
+    rdcarray<VkCommandBuffer> submittedcmds;
+    // -> FlushQ() ------back to freecmds------^
+
+    rdcarray<VkSemaphore> freesems;
+    // -> GetNextSemaphore() ->
+    rdcarray<VkSemaphore> pendingsems;
+    // -> SubmitSemaphores() ->
+    rdcarray<VkSemaphore> submittedsems;
+    // -> FlushQ() ----back to freesems-------^
+  } m_InternalCmds;
+
+  VkBool32 DebugCallback(MessageSeverity severity, MessageCategory category, int messageCode,
+                         const char *pMessageId, const char *pMessage);
+
+  static VkBool32 VKAPI_PTR DebugUtilsCallbackStatic(
+      VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+      VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+      const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData);
+
 private:
   void AddEvent();
   void AddDrawcall(const DrawcallDescription &d);
   bool ProcessChunk(ReadSerialiser &ser, GXMChunk chunk);
 
+  void AddResource(ResourceId id, ResourceType type, const char *defaultNamePrefix);
+  void AddResourceCurChunk(ResourceDescription &descr);
+  void AddResourceCurChunk(ResourceId id);
+  // void AddResourceInitChunk(GXMResource res);
+
   template <typename SerialiserType>
   bool Serialise_ContextConfiguration(SerialiserType &ser, void *ctx);
 
-public:
+  void AddRequiredExtensions(bool instance, rdcarray<rdcstr> &extensionList,
+                             const std::set<rdcstr> &supportedExtensions);
 
+  rdcarray<WindowingSystem> m_SupportedWindowSystems;
+  VulkanState m_vulkanState;
+
+  struct PhysicalDeviceData
+  {
+    uint32_t GetMemoryIndex(uint32_t resourceRequiredBitmask, uint32_t allocRequiredProps,
+                            uint32_t allocUndesiredProps);
+
+    uint32_t readbackMemIndex = 0;
+    uint32_t uploadMemIndex = 0;
+    uint32_t GPULocalMemIndex = 0;
+
+    VkPhysicalDeviceMemoryProperties memProps = {};
+  };
+
+  PhysicalDeviceData m_PhysicalDeviceData;
+
+public:
   IMPLEMENT_FUNCTION_SERIALISED(int, sceGxmInitialize, const SceGxmInitializeParams *params);
   IMPLEMENT_FUNCTION_SERIALISED(int, sceGxmTerminate);
   IMPLEMENT_FUNCTION_SERIALISED(volatile unsigned int *, sceGxmGetNotificationRegion);

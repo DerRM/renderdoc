@@ -23,7 +23,7 @@
  ******************************************************************************/
 
 #include "strings/string_utils.h"
-//#include "vk_core.h"
+#include "gxm_core.h"
 #include "gxm_replay.h"
 
 #include <shlwapi.h>
@@ -33,12 +33,12 @@ static int dllLocator = 0;
 void GXMReplay::OutputWindow::SetWindowHandle(WindowingData window)
 {
   RDCASSERT(window.system == WindowingSystem::Win32, window.system);
-  //wnd = window.win32.window;
+  wnd = window.win32.window;
 }
 
 void GXMReplay::OutputWindow::CreateSurface(WrappedGXM *driver)
 {
-  /*
+  
   VkWin32SurfaceCreateInfoKHR createInfo;
 
   createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -50,14 +50,12 @@ void GXMReplay::OutputWindow::CreateSurface(WrappedGXM *driver)
       GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
       (const char *)&dllLocator, (HMODULE *)&createInfo.hinstance);
 
-  VkResult vkr = ObjDisp(inst)->CreateWin32SurfaceKHR(Unwrap(inst), &createInfo, NULL, &surface);
+  VkResult vkr = vkCreateWin32SurfaceKHR(driver->GetVulkanState().m_Instance, &createInfo, NULL, &surface);
   RDCASSERTEQUAL(vkr, VK_SUCCESS);
-  */
 }
 
 void GXMReplay::GetOutputWindowDimensions(uint64_t id, int32_t &w, int32_t &h)
 {
-  /*
   if(id == 0 || m_OutputWindows.find(id) == m_OutputWindows.end())
     return;
 
@@ -74,14 +72,10 @@ void GXMReplay::GetOutputWindowDimensions(uint64_t id, int32_t &w, int32_t &h)
   GetClientRect(outw.wnd, &rect);
   w = rect.right - rect.left;
   h = rect.bottom - rect.top;
-  */
-  w = 0;
-  h = 0;
 }
 
 bool GXMReplay::IsOutputWindowVisible(uint64_t id)
 {
-  /*
   if(id == 0 || m_OutputWindows.find(id) == m_OutputWindows.end())
     return false;
 
@@ -89,11 +83,9 @@ bool GXMReplay::IsOutputWindowVisible(uint64_t id)
     return true;
 
   return (IsWindowVisible(m_OutputWindows[id].wnd) == TRUE);
-  */
-  return true;
 }
-/*
-void WrappedVulkan::AddRequiredExtensions(bool instance, rdcarray<rdcstr> &extensionList,
+
+void WrappedGXM::AddRequiredExtensions(bool instance, rdcarray<rdcstr> &extensionList,
                                           const std::set<rdcstr> &supportedExtensions)
 {
   bool device = !instance;
@@ -139,11 +131,12 @@ void WrappedVulkan::AddRequiredExtensions(bool instance, rdcarray<rdcstr> &exten
   }
 }
 
+/*
 #if !defined(VK_USE_PLATFORM_WIN32_KHR)
 #error "Win32 KHR platform not defined"
 #endif
 
-VkResult WrappedVulkan::vkCreateWin32SurfaceKHR(VkInstance instance,
+VkResult WrappedGXM::vkCreateWin32SurfaceKHR(VkInstance instance,
                                                 const VkWin32SurfaceCreateInfoKHR *pCreateInfo,
                                                 const VkAllocationCallbacks *pAllocator,
                                                 VkSurfaceKHR *pSurface)
@@ -152,7 +145,7 @@ VkResult WrappedVulkan::vkCreateWin32SurfaceKHR(VkInstance instance,
   RDCASSERT(IsCaptureMode(m_State));
 
   VkResult ret =
-      ObjDisp(instance)->CreateWin32SurfaceKHR(Unwrap(instance), pCreateInfo, pAllocator, pSurface);
+      vkCreateWin32SurfaceKHR(Unwrap(instance), pCreateInfo, pAllocator, pSurface);
 
   if(ret == VK_SUCCESS)
   {

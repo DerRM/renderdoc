@@ -377,3 +377,13 @@ rdcstr DoStringise(const SceGxmDepthWriteMode &el)
   }
   END_ENUM_STRINGISE();
 }
+
+template <>
+rdcstr DoStringise(const SceDisplayPixelFormat &el)
+{
+  BEGIN_ENUM_STRINGISE(SceDisplayPixelFormat);
+  {
+    STRINGISE_ENUM(SCE_DISPLAY_PIXELFORMAT_A8B8G8R8)
+  }
+  END_ENUM_STRINGISE();
+}

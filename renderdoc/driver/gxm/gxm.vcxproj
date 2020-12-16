@@ -87,7 +87,7 @@
       </SDLCheck>
       <ConformanceMode>false</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)renderdoc\;$(SolutionDir)renderdoc\3rdparty\</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>RENDERDOC_EXPORTS;RENDERDOC_PLATFORM_WIN32;WIN32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>VK_USE_PLATFORM_WIN32_KHR;VK_NO_PROTOTYPES;RENDERDOC_EXPORTS;RENDERDOC_PLATFORM_WIN32;WIN32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -139,7 +139,7 @@
       </SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)renderdoc\;$(SolutionDir)renderdoc\3rdparty\</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>RENDERDOC_EXPORTS;RENDERDOC_PLATFORM_WIN32;WIN32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>VK_USE_PLATFORM_WIN32_KHR;VK_NO_PROTOTYPES;RENDERDOC_EXPORTS;RENDERDOC_PLATFORM_WIN32;WIN32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <SupportJustMyCode>true</SupportJustMyCode>
@@ -153,6 +153,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="gxm_common.h" />
+    <ClInclude Include="gxm_core.h" />
     <ClInclude Include="gxm_driver.h" />
     <ClInclude Include="gxm_enum.h" />
     <ClInclude Include="gxm_initstate.h" />
@@ -160,18 +161,27 @@
     <ClInclude Include="gxm_replay.h" />
     <ClInclude Include="gxm_resources.h" />
     <ClInclude Include="gxm_types.h" />
+    <ClInclude Include="gxm_vk_info.h" />
+    <ClInclude Include="gxm_vk_loader.h" />
+    <ClInclude Include="gxm_vk_shader_cache.h" />
     <ClInclude Include="official\gxm.h" />
     <ClInclude Include="official\types.h" />
     <ClInclude Include="precompiled.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gxm_common.cpp" />
+    <ClCompile Include="gxm_core.cpp" />
+    <ClCompile Include="gxm_debug.cpp" />
     <ClCompile Include="gxm_driver.cpp" />
     <ClCompile Include="gxm_initstate.cpp" />
     <ClCompile Include="gxm_manager.cpp" />
+    <ClCompile Include="gxm_outputwindow.cpp" />
     <ClCompile Include="gxm_replay.cpp" />
     <ClCompile Include="gxm_stringise.cpp" />
     <ClCompile Include="gxm_types.cpp" />
+    <ClCompile Include="gxm_vk_info.cpp" />
+    <ClCompile Include="gxm_vk_loader.cpp" />
+    <ClCompile Include="gxm_vk_shader_cache.cpp" />
     <ClCompile Include="gxm_win32.cpp" />
     <ClCompile Include="precompiled.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Create</PrecompiledHeader>

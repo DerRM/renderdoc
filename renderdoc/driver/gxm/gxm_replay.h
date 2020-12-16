@@ -31,6 +31,14 @@
 #include "gxm_common.h"
 #include "gxm_driver.h"
 
+#if ENABLED(RDOC_WIN32)
+
+#include <windows.h>
+#define WINDOW_HANDLE_DECL HWND wnd;
+#define WINDOW_HANDLE_INIT wnd = NULL;
+
+#endif
+
 class GXMReplay : IReplayDriver
 {
 public:
@@ -41,6 +49,7 @@ public:
 
   APIProperties GetAPIProperties();
 
+  ResourceDescription &GetResourceDesc(ResourceId id);
   rdcarray<ResourceDescription> GetResources();
 
   rdcarray<BufferDescription> GetBuffers();
@@ -190,7 +199,7 @@ public:
 
     WindowingSystem m_WindowSystem;
 
-    // WINDOW_HANDLE_DECL;
+    WINDOW_HANDLE_DECL;
 
     bool fresh = true;
     bool outofdate = false;
@@ -202,7 +211,6 @@ public:
     int failures;
     int recreatePause;
 
-    /*
     VkSurfaceKHR surface;
     VkSwapchainKHR swap;
     uint32_t numImgs;
@@ -224,11 +232,50 @@ public:
     VkDeviceMemory dsmem;
     VkImageView dsview;
     VkImageMemoryBarrier depthBarrier;
-    */
   };
+
+  struct OverlayRendering
+  {
+    //void Init(WrappedGXM *driver, VkDescriptorPool descriptorPool);
+    //void Destroy(WrappedGXM *driver);
+
+    VkDeviceMemory ImageMem = VK_NULL_HANDLE;
+    VkDeviceSize ImageMemSize = 0;
+    VkImage Image = VK_NULL_HANDLE;
+    VkExtent2D ImageDim = {0, 0};
+    VkImageView ImageView = VK_NULL_HANDLE;
+    VkFramebuffer NoDepthFB = VK_NULL_HANDLE;
+    VkRenderPass NoDepthRP = VK_NULL_HANDLE;
+
+    VkDescriptorSetLayout m_CheckerDescSetLayout = VK_NULL_HANDLE;
+    VkPipelineLayout m_CheckerPipeLayout = VK_NULL_HANDLE;
+    VkDescriptorSet m_CheckerDescSet = VK_NULL_HANDLE;
+    VkPipeline m_CheckerPipeline = VK_NULL_HANDLE;
+    VkPipeline m_CheckerMSAAPipeline = VK_NULL_HANDLE;
+    VkPipeline m_CheckerF16Pipeline[8] = {VK_NULL_HANDLE};
+    GPUBuffer m_CheckerUBO;
+
+    VkDescriptorSetLayout m_QuadDescSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSet m_QuadDescSet = VK_NULL_HANDLE;
+    VkPipelineLayout m_QuadResolvePipeLayout = VK_NULL_HANDLE;
+    VkPipeline m_QuadResolvePipeline[8] = {VK_NULL_HANDLE};
+
+    GPUBuffer m_TriSizeUBO;
+    VkDescriptorSetLayout m_TriSizeDescSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSet m_TriSizeDescSet = VK_NULL_HANDLE;
+    VkPipelineLayout m_TriSizePipeLayout = VK_NULL_HANDLE;
+  } m_Overlay;
 
 private:
   WrappedGXM *m_pDriver;
+
+  rdcarray<ResourceDescription> m_Resources;
+  std::map<ResourceId, size_t> m_ResourceIdx;
+
   FrameRecord m_FrameRecord;
+
+  std::map<uint64_t, OutputWindow> m_OutputWindows;
   uint64_t m_OutputWinID;
+  uint64_t m_ActiveWinID;
+  uint32_t m_DebugWidth, m_DebugHeight;
 };

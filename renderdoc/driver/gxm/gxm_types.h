@@ -291,7 +291,6 @@ enum class GXMType : uint32_t {
   SceGXMUnknown
 };
 
-
 extern "C" {
 const char *textureBaseFormat2str(SceGxmTextureFormat format);
 const char *textureSwizzle4Mode2str(SceGxmTextureFormat format);

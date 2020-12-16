@@ -53,6 +53,18 @@
     <ClInclude Include="gxm_initstate.h">
       <Filter>Util</Filter>
     </ClInclude>
+    <ClInclude Include="gxm_core.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="gxm_vk_loader.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="gxm_vk_shader_cache.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="gxm_vk_info.h">
+      <Filter>Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gxm_driver.cpp">
@@ -89,6 +101,24 @@
       <Filter>Util</Filter>
     </ClCompile>
     <ClCompile Include="gxm_initstate.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="gxm_core.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="gxm_vk_loader.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="gxm_outputwindow.cpp">
+      <Filter>Replay</Filter>
+    </ClCompile>
+    <ClCompile Include="gxm_debug.cpp">
+      <Filter>Replay</Filter>
+    </ClCompile>
+    <ClCompile Include="gxm_vk_shader_cache.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="gxm_vk_info.cpp">
       <Filter>Util</Filter>
     </ClCompile>
   </ItemGroup>

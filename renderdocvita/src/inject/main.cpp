@@ -1118,6 +1118,7 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
         g_fileoffset += g_file.write(g_framebuffer.height);
         g_fileoffset += g_file.write(g_framebuffer.pitch);
         g_fileoffset += g_file.write(g_framebuffer.pixelformat);
+        g_fileoffset += g_file.write(++g_resourceid);
 
         g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }

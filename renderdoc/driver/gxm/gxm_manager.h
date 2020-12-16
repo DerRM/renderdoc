@@ -29,12 +29,34 @@ public:
     return ResourceManager::GetResourceRecord(GetID(res));
   }
 
-  ResourceId GetID(GXMResource res) 
+  ResourceId GetID(GXMResource res)
   {
     auto it = m_CurrentResourceIds.find(res);
     if(it != m_CurrentResourceIds.end())
       return it->second;
     return ResourceId();
+  }
+
+  inline void RemoveResourceRecord(ResourceId id)
+  {
+    for(auto it = m_GXMResourceRecords.begin(); it != m_GXMResourceRecords.end(); it++)
+    {
+      if (it->second->GetResourceID() == id)
+      {
+        m_GXMResourceRecords.erase(it);
+        break;
+      }
+    }
+
+    ResourceManager::RemoveResourceRecord(id);
+  }
+
+  ResourceId RegisterResource(GXMResource res) 
+  {
+    ResourceId id = ResourceIDGen::GetNewUniqueID();
+    m_CurrentResourceIds[res] = id;
+    AddCurrentResource(id, res);
+    return id;
   }
 
   template <typename SerialiserType>

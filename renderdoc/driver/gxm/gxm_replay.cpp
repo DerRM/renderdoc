@@ -26,6 +26,8 @@
 #include "common/common.h"
 #include "serialise/serialiser.h"
 #include "serialise/rdcfile.h"
+#include "maths/formatpacking.h"
+#include "strings/string_utils.h"
 #include "gxm_driver.h"
 #include "gxm_replay.h"
 
@@ -179,15 +181,36 @@ uint64_t GXMReplay::MakeOutputWindow(WindowingData window, bool depth)
 {
   uint64_t id = m_OutputWinID;
   m_OutputWinID++;
+
+  m_OutputWindows[id].m_WindowSystem = window.system;
+
+  if(window.system != WindowingSystem::Unknown && window.system != WindowingSystem::Headless)
+    m_OutputWindows[id].SetWindowHandle(window);
+
+  if(window.system != WindowingSystem::Unknown)
+  {
+    int32_t w, h;
+
+    if(window.system == WindowingSystem::Headless)
+    {
+      w = window.headless.width;
+      h = window.headless.height;
+    }
+    else
+    {
+      GetOutputWindowDimensions(id, w, h);
+    }
+
+    m_OutputWindows[id].width = w;
+    m_OutputWindows[id].height = h;
+
+    m_OutputWindows[id].Create(m_pDriver, depth);
+  }
+
   return id;
 }
 
 void GXMReplay::DestroyOutputWindow(uint64_t id) {}
-
-bool GXMReplay::CheckResizeOutputWindow(uint64_t id)
-{
-  return false;
-}
 
 void GXMReplay::SetOutputWindowDimensions(uint64_t id, int32_t w, int32_t h) {}
 
@@ -196,10 +219,6 @@ void GXMReplay::GetOutputWindowData(uint64_t id, bytebuf &retData) {}
 void GXMReplay::ClearOutputWindowColor(uint64_t id, FloatVector col) {}
 
 void GXMReplay::ClearOutputWindowDepth(uint64_t id, float depth, uint8_t stencil) {}
-
-void GXMReplay::BindOutputWindow(uint64_t id, bool depth) {}
-
-void GXMReplay::FlipOutputWindow(uint64_t id) {}
 
 bool GXMReplay::GetMinMax(ResourceId texid, const Subresource &sub, CompType typeCast,
                           float *minval, float *maxval)
@@ -270,9 +289,257 @@ ResourceId GXMReplay::ApplyCustomShader(ResourceId shader, ResourceId texid, con
 
 void GXMReplay::FreeCustomShader(ResourceId id) {}
 
-void GXMReplay::RenderCheckerboard() {}
+void GXMReplay::RenderCheckerboard()
+{
+  auto it = m_OutputWindows.find(m_ActiveWinID);
+  if(m_ActiveWinID == 0 || it == m_OutputWindows.end())
+    return;
 
-void GXMReplay::RenderHighlightBox(float w, float h, float scale) {}
+  OutputWindow &outw = it->second;
+
+  // if the swapchain failed to create, do nothing. We will try to recreate it
+  // again in CheckResizeOutputWindow (once per render 'frame')
+  if(outw.m_WindowSystem != WindowingSystem::Headless && outw.swap == VK_NULL_HANDLE)
+    return;
+
+  //VkDevice dev = m_pDriver->m_vulkanState.m_Device;
+  VkCommandBuffer cmd = m_pDriver->GetNextCmd();
+
+  VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, NULL,
+                                        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
+
+  VkResult vkr = vkBeginCommandBuffer(cmd, &beginInfo);
+  RDCASSERTEQUAL(vkr, VK_SUCCESS);
+
+  //uint32_t uboOffs = 0;
+
+  VkRenderPassBeginInfo rpbegin = {
+      VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+      NULL,
+      outw.rp,
+      outw.fb,
+      {{
+           0,
+           0,
+       },
+       {m_DebugWidth, m_DebugHeight}},
+      0,
+      NULL,
+  };
+  vkCmdBeginRenderPass(cmd, &rpbegin, VK_SUBPASS_CONTENTS_INLINE);
+
+  /*if(m_Overlay.m_CheckerPipeline != VK_NULL_HANDLE)
+  {
+    CheckerboardUBOData *data = (CheckerboardUBOData *)m_Overlay.m_CheckerUBO.Map(&uboOffs);
+    data->BorderWidth = 0.0f;
+    data->RectPosition = Vec2f();
+    data->RectSize = Vec2f();
+    data->CheckerSquareDimension = 64.0f;
+    data->InnerColor = Vec4f();
+
+    data->PrimaryColor = ConvertSRGBToLinear(RenderDoc::Inst().DarkCheckerboardColor());
+    data->SecondaryColor = ConvertSRGBToLinear(RenderDoc::Inst().LightCheckerboardColor());
+    m_Overlay.m_CheckerUBO.Unmap();
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        outw.dsimg == VK_NULL_HANDLE ? Unwrap(m_Overlay.m_CheckerPipeline)
+                                                     : Unwrap(m_Overlay.m_CheckerMSAAPipeline));
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              Unwrap(m_Overlay.m_CheckerPipeLayout), 0, 1,
+                              UnwrapPtr(m_Overlay.m_CheckerDescSet), 1, &uboOffs);
+
+    VkViewport viewport = {0.0f, 0.0f, (float)m_DebugWidth, (float)m_DebugHeight, 0.0f, 1.0f};
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    vkCmdDraw(cmd, 4, 1, 0, 0);
+
+    if(m_pDriver->GetDriverInfo().QualcommLeakingUBOOffsets())
+    {
+      uboOffs = 0;
+      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                Unwrap(m_Overlay.m_CheckerPipeLayout), 0, 1,
+                                UnwrapPtr(m_Overlay.m_CheckerDescSet), 1, &uboOffs);
+    }
+  }
+  else*/
+  {
+    // some mobile chips fail to create the checkerboard pipeline. Use an alternate approach with
+    // CmdClearAttachment and many rects.
+
+    Vec4f lightCol = RenderDoc::Inst().LightCheckerboardColor();
+    Vec4f darkCol = RenderDoc::Inst().DarkCheckerboardColor();
+
+    VkClearAttachment light = {
+        VK_IMAGE_ASPECT_COLOR_BIT, 0, {{{lightCol.x, lightCol.y, lightCol.z, lightCol.w}}}};
+    VkClearAttachment dark = {
+        VK_IMAGE_ASPECT_COLOR_BIT, 0, {{{darkCol.x, darkCol.y, darkCol.z, darkCol.w}}}};
+
+    VkClearRect fullRect = {{
+                                {0, 0},
+                                {outw.width, outw.height},
+                            },
+                            0,
+                            1};
+
+    vkCmdClearAttachments(cmd, 1, &light, 1, &fullRect);
+
+    rdcarray<VkClearRect> squares;
+
+    for(int32_t y = 0; y < (int32_t)outw.height; y += 128)
+    {
+      for(int32_t x = 0; x < (int32_t)outw.width; x += 128)
+      {
+        VkClearRect square = {{
+                              {x, y},
+                              {
+                              (((uint32_t)x + 64) > outw.width ? 64 - (outw.width % 64) : 64),
+                              (((uint32_t)y + 64) > outw.height? 64 - (outw.height % 64) : 64) },
+                              },
+                              0,
+                              1};
+
+        squares.push_back(square);
+       
+        square.rect.offset.x +=
+            ((uint32_t)square.rect.offset.x + 64) > outw.width ? (outw.width % 64) - 1 : 64;
+        square.rect.extent.width =
+            ((uint32_t)square.rect.offset.x + 64) > outw.width ? (outw.width % 64) - 1 : 64;
+       
+        if(square.rect.offset.x == (int32_t)(outw.width - 1))
+        {
+          square.rect.extent.width = 0;
+        }
+
+        square.rect.offset.y +=
+            ((uint32_t)square.rect.offset.y + 64) > outw.height ? (outw.height % 64) - 1 : 64;
+        square.rect.extent.height =
+            ((uint32_t)square.rect.offset.y + 64) > outw.height ? (outw.height % 64) - 1 : 64;
+
+        if(square.rect.offset.y == (int32_t)(outw.height - 1))
+        {
+          square.rect.extent.height = 0;
+        }
+
+        squares.push_back(square);
+      }
+    }
+
+    vkCmdClearAttachments(cmd, 1, &dark, (uint32_t)squares.size(), squares.data());
+  }
+
+  vkCmdEndRenderPass(cmd);
+
+  vkr = vkEndCommandBuffer(cmd);
+  RDCASSERTEQUAL(vkr, VK_SUCCESS);
+
+#if ENABLED(SINGLE_FLUSH_VALIDATE)
+  m_pDriver->SubmitCmds();
+#endif
+}
+
+void GXMReplay::RenderHighlightBox(float w, float h, float scale)
+{
+  auto it = m_OutputWindows.find(m_ActiveWinID);
+  if(m_ActiveWinID == 0 || it == m_OutputWindows.end())
+    return;
+
+  OutputWindow &outw = it->second;
+
+  // if the swapchain failed to create, do nothing. We will try to recreate it
+  // again in CheckResizeOutputWindow (once per render 'frame')
+  if(outw.m_WindowSystem != WindowingSystem::Headless && outw.swap == VK_NULL_HANDLE)
+    return;
+
+  //VkDevice dev = m_pDriver->m_vulkanState.m_Device;
+  VkCommandBuffer cmd = m_pDriver->GetNextCmd();
+
+  VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, NULL,
+                                        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
+
+  VkResult vkr = vkBeginCommandBuffer(cmd, &beginInfo);
+  RDCASSERTEQUAL(vkr, VK_SUCCESS);
+
+  {
+    VkRenderPassBeginInfo rpbegin = {
+        VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        NULL,
+        outw.rp,
+        outw.fb,
+        {{
+             0,
+             0,
+         },
+         {m_DebugWidth, m_DebugHeight}},
+        0,
+        NULL,
+    };
+    vkCmdBeginRenderPass(cmd, &rpbegin, VK_SUBPASS_CONTENTS_INLINE);
+
+    VkClearAttachment black = {VK_IMAGE_ASPECT_COLOR_BIT, 0, {{{0.0f, 0.0f, 0.0f, 1.0f}}}};
+    VkClearAttachment white = {VK_IMAGE_ASPECT_COLOR_BIT, 0, {{{1.0f, 1.0f, 1.0f, 1.0f}}}};
+
+    uint32_t sz = uint32_t(scale);
+
+    VkOffset2D tl = {int32_t(w / 2.0f + 0.5f), int32_t(h / 2.0f + 0.5f)};
+
+    VkClearRect rect[4] = {
+        {{
+             {tl.x, tl.y},
+             {1, sz},
+         },
+         0,
+         1},
+        {{
+             {tl.x + (int32_t)sz, tl.y},
+             {1, sz + 1},
+         },
+         0,
+         1},
+        {{
+             {tl.x, tl.y},
+             {sz, 1},
+         },
+         0,
+         1},
+        {{
+             {tl.x, tl.y + (int32_t)sz},
+             {sz, 1},
+         },
+         0,
+         1},
+    };
+
+    // inner
+    vkCmdClearAttachments(cmd, 1, &white, 4, rect);
+
+    rect[0].rect.offset.x--;
+    rect[1].rect.offset.x++;
+    rect[2].rect.offset.x--;
+    rect[3].rect.offset.x--;
+
+    rect[0].rect.offset.y--;
+    rect[1].rect.offset.y--;
+    rect[2].rect.offset.y--;
+    rect[3].rect.offset.y++;
+
+    rect[0].rect.extent.height += 2;
+    rect[1].rect.extent.height += 2;
+    rect[2].rect.extent.width += 2;
+    rect[3].rect.extent.width += 2;
+
+    // outer
+    vkCmdClearAttachments(cmd, 1, &black, 4, rect);
+
+    vkCmdEndRenderPass(cmd);
+  }
+
+  vkr = vkEndCommandBuffer(cmd);
+  RDCASSERTEQUAL(vkr, VK_SUCCESS);
+
+#if ENABLED(SINGLE_FLUSH_VALIDATE)
+  m_pDriver->SubmitCmds();
+#endif
+}
 
 uint32_t GXMReplay::PickVertex(uint32_t eventId, int32_t width, int32_t height,
                                const MeshDisplay &cfg, uint32_t x, uint32_t y)
@@ -286,7 +553,19 @@ ReplayStatus GXM_CreateReplayDevice(RDCFile *rdc, const ReplayOptions &opts, IRe
 {
   RDCLOG("Creating an GXM replay device");
 
+  void *module = LoadVulkanLibrary();
+
+  if(module == NULL)
+  {
+    RDCERR("Failed to load vulkan library");
+    return ReplayStatus::APIInitFailed;
+  }
+
+  InitialiseVulkanCalls(module);
+
   WrappedGXM *gxmdriver = new WrappedGXM();
+
+  gxmdriver->Initialise();
 
   *driver = (IReplayDriver *)gxmdriver->GetReplay();
 
@@ -299,6 +578,7 @@ GXMReplay::GXMReplay(WrappedGXM *d)
 {
   m_pDriver = d;
   m_OutputWinID = 1;
+  m_ActiveWinID = 0;
 }
 
 void GXMReplay::Shutdown() {}
@@ -316,9 +596,23 @@ APIProperties GXMReplay::GetAPIProperties()
   return ret;
 }
 
+ResourceDescription &GXMReplay::GetResourceDesc(ResourceId id)
+{
+  auto it = m_ResourceIdx.find(id);
+  if (it == m_ResourceIdx.end())
+  {
+    m_ResourceIdx[id] = m_Resources.size();
+    m_Resources.push_back(ResourceDescription());
+    m_Resources.back().resourceId = id;
+    return m_Resources.back();
+  }
+
+  return m_Resources[it->second];
+}
+
 rdcarray<ResourceDescription> GXMReplay::GetResources()
 {
-  return rdcarray<ResourceDescription>();
+  return m_Resources;
 }
 
 rdcarray<BufferDescription> GXMReplay::GetBuffers()
