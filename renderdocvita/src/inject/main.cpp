@@ -16,6 +16,7 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <new>
 
 #include "util.h"
 #include "../logging.h"
@@ -89,8 +90,20 @@ void* g_baseFrame;
 uint32_t g_frameCount = 0;
 uint32_t g_logFrameCount = 0;
 uint32_t g_displayWaitCount = 0;
+void* g_baseAddr = NULL;
 
 SceDisplayFrameBuf g_framebuffer;
+
+struct MappedMemory
+{
+    int64_t resId;
+    void* addr;
+    uint32_t size;
+};
+
+#define MAX_MAPPED_MEMORY_COUNT 32
+MappedMemory* g_memoryArray = NULL;
+uint32_t g_mappedMemoryCount = 0;
 
 const SceGxmVertexProgram * g_activeVertexProgram = NULL;
 const void * g_activeVertexStreams[SCE_GXM_MAX_VERTEX_STREAMS] = { NULL };
@@ -409,7 +422,7 @@ static tai_hook_ref_t sceKernelAllocMemBlockRef;
 static SceUID sceKernelAllocMemBlockHook;
 SceUID sceKernelAllocMemBlockPatched(const char *name, SceKernelMemBlockType type, int size, SceKernelAllocMemBlockOpt *optp) {
     SceUID res = TAI_NEXT(sceKernelAllocMemBlock, sceKernelAllocMemBlockRef, name, type, size, optp);
-    LOGD("sceKernelAllocMemBlock(ret SceUID: %" PRIi32 ", name: %s)\n", res, name);
+    LOG("sceKernelAllocMemBlock(ret SceUID: %" PRIi32 ", name: %s, type: %s, size: %" PRIi32 ")\n", res, name, kernelmemblock2str(type), size);
     return res;
 }
 
@@ -417,7 +430,7 @@ static tai_hook_ref_t sceKernelGetMemBlockBaseRef;
 static SceUID sceKernelGetMemBlockBaseHook;
 int sceKernelGetMemBlockBasePatched(SceUID uid, void **basep) {
     int res = TAI_NEXT(sceKernelGetMemBlockBase, sceKernelGetMemBlockBaseRef, uid, basep);
-    //LOGD("sceKernelGetMemBlockBase(uid: %" PRIi32 ", base pointer: %p)\n", uid, *basep);
+    //LOG("sceKernelGetMemBlockBase(uid: %" PRIi32 ", base pointer: %p)\n", uid, *basep);
     return res;
 }
 
@@ -1057,6 +1070,8 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
         //g_fd = -1;
     }
 
+    ++g_frameCount;
+
     if (g_capture) {
         // clear all display queue calls to make sure the current 
         // framebuffer is really the one we currently have rendered to
@@ -1110,7 +1125,20 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
 
         uint32_t chunkSize = 0;
 
-        GXMChunk type = GXMChunk::ContextConfiguration;
+        // TODO: serialize used resources here
+
+        GXMChunk type = (GXMChunk)5; // SystemChunk::CaptureScope
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(g_frameCount);
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
+
+        type = (GXMChunk)4; // SystemChunk::CaptureBegin
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
+
+        type = GXMChunk::ContextConfiguration;
         g_fileoffset += g_file.write(type);
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(g_framebuffer.base);
@@ -1122,8 +1150,6 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
 
         g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
-
-    ++g_frameCount;
 
     return ret;
 }
@@ -1197,6 +1223,20 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
 
         g_fileoffset += ALIGN_TO_64(g_fileoffset);
         g_fileoffset += g_file.write(indexData, indexbufferSize);
+        g_fileoffset += g_file.write(++g_resourceid);
+
+        bool found = false;
+        for (uint32_t memory_index = 0; memory_index < g_mappedMemoryCount; ++memory_index) {
+            if (indexData >= g_memoryArray[memory_index].addr && ((uintptr_t)indexData + indexbufferSize) < ((uintptr_t)g_memoryArray[memory_index].addr + g_memoryArray[memory_index].size)) {
+                g_fileoffset += g_file.write(g_memoryArray[memory_index].resId);
+                found = true;
+            }
+        }
+
+        if (!found) {
+            LOG("WARN: could not mapped memory for index buffer\n");
+            g_fileoffset += g_file.write((uint64_t)0);
+        }
 
         //ProgramResource programRes;
         //g_resource_manager.find(GXMType::SceGxmProgram, (uint32_t)vertexRes.programId, &programRes);
@@ -1214,6 +1254,20 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
 
             g_fileoffset += ALIGN_TO_64(g_fileoffset);
             g_fileoffset += g_file.write(g_activeVertexStreams[vertexRes.streams[stream_index].indexSource], vertexBufferSize);
+            g_fileoffset += g_file.write(++g_resourceid);
+
+            found = false;
+            for (uint32_t memory_index = 0; memory_index < g_mappedMemoryCount; ++memory_index) {
+                if (g_activeVertexStreams[vertexRes.streams[stream_index].indexSource] >= g_memoryArray[memory_index].addr && ((uintptr_t)g_activeVertexStreams[vertexRes.streams[stream_index].indexSource] + vertexBufferSize) < ((uintptr_t)g_memoryArray[memory_index].addr + g_memoryArray[memory_index].size)) {
+                    g_fileoffset += g_file.write(g_memoryArray[memory_index].resId);
+                    found = true;
+                }
+            }
+
+            if (!found) {
+                LOG("WARN: could not mapped memory for vertex buffer\n");
+                g_fileoffset += g_file.write((uint64_t)0);
+            }
         }
 
         g_fileoffset += ALIGN_TO_64(g_fileoffset);
@@ -1410,7 +1464,33 @@ CREATE_PATCHED_CALL(int, sceGxmMapFragmentUsseMemory, void *base, SceSize size, 
 
 CREATE_PATCHED_CALL(int, sceGxmMapMemory, void *base, SceSize size, SceGxmMemoryAttribFlags attr)
 {
-    LOGD("sceGxmMapMemory(base: %p, size: %" PRIu32 ", attr: %" PRIu32 ")\n", base, size, attr);
+    uint64_t resid = ++g_resourceid;
+
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmMapMemory;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(base);
+        g_fileoffset += g_file.write(size);
+        g_fileoffset += g_file.write(attr);
+        g_fileoffset += g_file.write(resid);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
+    }
+
+    if (g_mappedMemoryCount + 1 < MAX_MAPPED_MEMORY_COUNT) {
+        g_memoryArray[g_mappedMemoryCount].resId = resid;
+        g_memoryArray[g_mappedMemoryCount].addr = base;
+        g_memoryArray[g_mappedMemoryCount].size = size;
+        ++g_mappedMemoryCount;
+    }
+    else {
+        LOG("Warn: too much mapped memory blocks\n");
+    }
+
+    LOG("sceGxmMapMemory(base: %p, size: %" PRIu32 ", attr: %" PRIu32 ")\n", base, size, attr);
     return TAI_NEXT(sceGxmMapMemory, sceGxmMapMemoryRef, base, size, attr);
 }
 
@@ -2525,7 +2605,32 @@ CREATE_PATCHED_CALL(int, sceGxmUnmapFragmentUsseMemory, void *base)
 
 CREATE_PATCHED_CALL(int, sceGxmUnmapMemory, void *base)
 {
-    LOGD("sceGxmuUnmapMemory(base: %p)\n", base);
+    if (g_log) {
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = GXMChunk::sceGxmUnmapMemory;
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += g_file.write(base);
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
+    }
+
+    for (uint32_t index = 0; index < g_mappedMemoryCount; ++index) {
+        if (g_memoryArray[index].addr == base) {
+            if (index == g_mappedMemoryCount - 1) {
+                g_memoryArray[index].resId = 0;
+                g_memoryArray[index].addr = NULL;
+                g_memoryArray[index].size = 0;
+            }
+            else {
+                MappedMemory tmp = g_memoryArray[g_mappedMemoryCount - 1];
+                g_memoryArray[index] = tmp;
+                --g_mappedMemoryCount;
+            }
+        }
+    }
+
+    LOG("sceGxmuUnmapMemory(base: %p)\n", base);
     return TAI_NEXT(sceGxmUnmapMemory, sceGxmUnmapMemoryRef, base);
 }
 
@@ -3247,6 +3352,15 @@ int module_start(SceSize args, void *argp) {
 
    // serverThreadId = createThread("TargetControlServerThread", &sRemoteControlThreadInit, 0, NULL);
     //clientControlThreadId = createThread("TargetClientControlThread", &sClientControlStartThreadInit, 0, NULL);
+
+    SceUID memuid = sceKernelAllocMemBlock("test",
+		SCE_KERNEL_MEMBLOCK_TYPE_USER_RW_UNCACHE, 2 * 1024 * 1024, NULL);
+    if (sceKernelGetMemBlockBase(memuid, &g_baseAddr) < 0) {
+        LOG("could not get base addr\n");
+    }
+    LOG("CDialog allocation: memuid: %" PRIi32 ", base addr: %p\n", memuid, g_baseAddr);
+
+    g_memoryArray = new(g_baseAddr)MappedMemory[MAX_MAPPED_MEMORY_COUNT];
 
     return SCE_KERNEL_START_SUCCESS;
 }

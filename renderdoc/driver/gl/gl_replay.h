@@ -142,6 +142,7 @@ public:
   const D3D12Pipe::State *GetD3D12PipelineState() { return NULL; }
   const GLPipe::State *GetGLPipelineState() { return &m_CurPipelineState; }
   const VKPipe::State *GetVulkanPipelineState() { return NULL; }
+  const GXMPipe::State *GetGXMPipelineState() { return NULL; }
   void FreeTargetResource(ResourceId id);
 
   ReplayStatus ReadLogInitialisation(RDCFile *rdc, bool storeStructuredBuffers);

@@ -95,6 +95,7 @@ public:
   const D3D12Pipe::State *GetD3D12PipelineState() { return &m_PipelineState; }
   const GLPipe::State *GetGLPipelineState() { return NULL; }
   const VKPipe::State *GetVulkanPipelineState() { return NULL; }
+  const GXMPipe::State *GetGXMPipelineState() { return NULL; }
   void FreeTargetResource(ResourceId id);
   void FreeCustomShader(ResourceId id);
 

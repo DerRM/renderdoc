@@ -30,6 +30,7 @@
 #include "gxm_common.h"
 #include "gxm_manager.h"
 #include "gxm_resources.h"
+#include "gxm_state.h"
 
 class GXMReplay;
 
@@ -60,6 +61,7 @@ private:
   bool m_AddedDrawcall;
   DrawcallDescription m_ParentDrawcall;
   GXMResourceManager *m_ResourceManager;
+  StreamReader *m_FrameReader = NULL;
 public:
   struct VulkanState
   {
@@ -78,6 +80,9 @@ public:
   GXMResourceManager *GetResourceManager() { return m_ResourceManager; }
   GXMReplay *GetReplay() { return m_Replay; }
 
+  void ReplayLog(uint32_t startEventID, uint32_t endEventID, ReplayLogType replayType);
+  ReplayStatus ContextReplayLog(CaptureState readType, uint32_t startEventID, uint32_t endEventID,
+                                bool partial);
   void SetDriverType(RDCDriver type) { m_DriverType = type; }
   RDCDriver GetDriverType() { return m_DriverType; }
   RDCDriver GetFrameCaptureDriver() { return GetDriverType(); }
@@ -97,6 +102,10 @@ public:
   void WrappedGXM::SubmitCmds();
   void WrappedGXM::FlushQ();
   GXMVkCreationInfo m_CreationInfo;
+
+  GXMRenderState m_RenderState;
+  GXMRenderState &GetRenderState() { return m_RenderState; }
+  GXMResources m_Resources;
 
   struct
   {

@@ -160,6 +160,7 @@
     <ClInclude Include="gxm_manager.h" />
     <ClInclude Include="gxm_replay.h" />
     <ClInclude Include="gxm_resources.h" />
+    <ClInclude Include="gxm_state.h" />
     <ClInclude Include="gxm_types.h" />
     <ClInclude Include="gxm_vk_info.h" />
     <ClInclude Include="gxm_vk_loader.h" />

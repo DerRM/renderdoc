@@ -510,6 +510,9 @@
     <ClInclude Include="psvita\vita.h">
       <Filter>PSVita</Filter>
     </ClInclude>
+    <ClInclude Include="api\replay\gxm_pipestate.h">
+      <Filter>API\Replay</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="maths\camera.cpp">

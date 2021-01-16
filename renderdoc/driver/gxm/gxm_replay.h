@@ -70,10 +70,11 @@ public:
   virtual rdcarray<EventUsage> GetUsage(ResourceId id);
 
   virtual void SavePipelineState(uint32_t eventId);
-  virtual const D3D11Pipe::State *GetD3D11PipelineState();
-  virtual const D3D12Pipe::State *GetD3D12PipelineState();
-  virtual const GLPipe::State *GetGLPipelineState();
-  virtual const VKPipe::State *GetVulkanPipelineState();
+  virtual const D3D11Pipe::State *GetD3D11PipelineState() { return NULL; }
+  virtual const D3D12Pipe::State *GetD3D12PipelineState() { return NULL; }
+  virtual const GLPipe::State *GetGLPipelineState() { return NULL; }
+  virtual const VKPipe::State *GetVulkanPipelineState() { return NULL; }
+  virtual const GXMPipe::State *GetGXMPipelineState() { return &m_PipelineState; }
 
   virtual FrameRecord GetFrameRecord() { return m_FrameRecord; }
   FrameRecord &WriteFrameRecord() { return m_FrameRecord; }
@@ -278,4 +279,6 @@ private:
   uint64_t m_OutputWinID;
   uint64_t m_ActiveWinID;
   uint32_t m_DebugWidth, m_DebugHeight;
+
+  GXMPipe::State m_PipelineState;
 };

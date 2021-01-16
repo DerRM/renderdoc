@@ -459,6 +459,15 @@ ResourceId PipeState::GetShader(ShaderStage stage) const
         default: break;
       }
     }
+    else if (IsCaptureGXM())
+    {
+      switch (stage)
+      {
+        case ShaderStage::Vertex: return ResourceId();
+        case ShaderStage::Fragment: return ResourceId();
+        default: break;
+      }
+    }
   }
 
   return ResourceId();
@@ -490,6 +499,11 @@ BoundVBuffer PipeState::GetIBuffer() const
     {
       buf = m_Vulkan->inputAssembly.indexBuffer.resourceId;
       ByteOffset = m_Vulkan->inputAssembly.indexBuffer.byteOffset;
+    }
+    else if (IsCaptureGXM())
+    {
+      buf = ResourceId();
+      ByteOffset = 0;
     }
   }
 
@@ -604,6 +618,16 @@ rdcarray<BoundVBuffer> PipeState::GetVBuffers() const
             break;
           }
         }
+      }
+    }
+    else if (IsCaptureGXM())
+    {
+      ret.resize(m_GXM->vertexInput.vertexBuffers.count());
+      for(int i = 0; i < m_GXM->vertexInput.vertexBuffers.count(); i++)
+      {
+        ret[i].resourceId = m_GXM->vertexInput.vertexBuffers[i].resourceId;
+        ret[i].byteOffset = m_GXM->vertexInput.vertexBuffers[i].byteOffset;
+        ret[i].byteStride = m_GXM->vertexInput.vertexBuffers[i].byteStride;
       }
     }
   }
@@ -880,6 +904,11 @@ rdcarray<VertexInputAttribute> PipeState::GetVertexInputs() const
         a++;
       }
 
+      return ret;
+    }
+    else if (IsCaptureGXM())
+    {
+      rdcarray<VertexInputAttribute> ret;
       return ret;
     }
   }

@@ -24,6 +24,8 @@
  ******************************************************************************/
 
 #include "gxm_driver.h"
+#include <algorithm>
+#include "common/common.h"
 #include "serialise/rdcfile.h"
 
 #include "gxm_replay.h"
@@ -69,11 +71,29 @@ ReplayStatus WrappedGXM::ReadLogInitialisation(RDCFile *rdc, bool storeStructure
 
   m_StructuredFile = &ser.GetStructuredFile();
 
+  int chunkIdx = 0;
+
+  struct chunkinfo
+  {
+    chunkinfo() : count(0), totalsize(0), total(0.0) {}
+    int count;
+    uint64_t totalsize;
+    double total;
+  };
+
+  std::map<GXMChunk, chunkinfo> chunkInfos;
+
+  SCOPED_TIMER("chunk initialisation");
+
+  uint64_t frameDataSize = 0;
+
   for(;;)
   {
-    m_CurChunkOffset = ser.GetReader()->GetOffset();
+    uint64_t offsetStart = m_CurChunkOffset = ser.GetReader()->GetOffset();
 
     GXMChunk context = ser.ReadChunk<GXMChunk>();
+
+    chunkIdx++;
 
     if(ser.GetReader()->IsErrored())
       return ReplayStatus::APIDataCorrupted;
@@ -90,10 +110,24 @@ ReplayStatus WrappedGXM::ReadLogInitialisation(RDCFile *rdc, bool storeStructure
     if(!success)
       return ReplayStatus::APIReplayFailed;
 
+    uint64_t offsetEnd = reader->GetOffset();
+
     if(!m_AddedDrawcall)
       AddEvent();
 
     m_AddedDrawcall = false;
+
+    if((SystemChunk)context == SystemChunk::CaptureScope)
+    {
+      GetReplay()->WriteFrameRecord().frameInfo.fileOffset = offsetStart;
+
+      frameDataSize = reader->GetSize() - reader->GetOffset();
+
+      m_FrameReader = new StreamReader(reader, frameDataSize);
+    }
+
+    chunkInfos[context].totalsize += offsetEnd - offsetStart;
+    chunkInfos[context].count++;
 
     if((SystemChunk)context == SystemChunk::CaptureScope || reader->IsErrored() || reader->AtEnd())
       break;
@@ -520,10 +554,13 @@ WrappedGXM::WrappedGXM()
   m_vulkanState.m_Instance = VK_NULL_HANDLE;
 }
 
-WrappedGXM::~WrappedGXM() {}
+WrappedGXM::~WrappedGXM()
+{
+  SAFE_DELETE(m_FrameReader);
+}
 
 VkBool32 WrappedGXM::DebugCallback(MessageSeverity severity, MessageCategory category,
-                                      int messageCode, const char *pMessageId, const char *pMessage)
+                                   int messageCode, const char *pMessageId, const char *pMessage)
 {
   {
     // ignore perf warnings
@@ -633,7 +670,7 @@ ReplayStatus WrappedGXM::Initialise()
   }
 
   rdcarray<const char *> strExtensions(enabledExtensions.size());
-  for (uint32_t strExtIndex = 0; strExtIndex < enabledExtensions.size(); ++strExtIndex)
+  for(uint32_t strExtIndex = 0; strExtIndex < enabledExtensions.size(); ++strExtIndex)
   {
     strExtensions[strExtIndex] = enabledExtensions[strExtIndex].c_str();
   }
@@ -648,7 +685,6 @@ ReplayStatus WrappedGXM::Initialise()
   for(uint32_t e = 0; e < count; e++)
     supportedLayers.insert(layerprops[e].layerName);
 
-
   const char KhronosValidation[] = "VK_LAYER_KHRONOS_validation";
   const char LunarGValidation[] = "VK_LAYER_LUNARG_standard_validation";
 
@@ -657,15 +693,15 @@ ReplayStatus WrappedGXM::Initialise()
   if(supportedLayers.find(KhronosValidation) != supportedLayers.end())
   {
     RDCLOG("Enabling %s layer for API validation", KhronosValidation);
-    //params.Layers.push_back(KhronosValidation);
-    //m_LayersEnabled[VkCheckLayer_unique_objects] = true;
+    // params.Layers.push_back(KhronosValidation);
+    // m_LayersEnabled[VkCheckLayer_unique_objects] = true;
     enabledLayers.push_back(KhronosValidation);
   }
   else if(supportedLayers.find(LunarGValidation) != supportedLayers.end())
   {
     RDCLOG("Enabling %s layer for API validation", LunarGValidation);
-    //params.Layers.push_back(LunarGValidation);
-    //m_LayersEnabled[VkCheckLayer_unique_objects] = true;
+    // params.Layers.push_back(LunarGValidation);
+    // m_LayersEnabled[VkCheckLayer_unique_objects] = true;
     enabledLayers.push_back(KhronosValidation);
   }
   else
@@ -709,7 +745,8 @@ ReplayStatus WrappedGXM::Initialise()
   debugInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 
-  vkCreateDebugUtilsMessengerEXT(m_vulkanState.m_Instance, &debugInfo, NULL, &m_vulkanState.m_DbgUtilsCallback);
+  vkCreateDebugUtilsMessengerEXT(m_vulkanState.m_Instance, &debugInfo, NULL,
+                                 &m_vulkanState.m_DbgUtilsCallback);
 
   vkEnumeratePhysicalDevices(m_vulkanState.m_Instance, &count, NULL);
 
@@ -737,12 +774,8 @@ ReplayStatus WrappedGXM::Initialise()
   float prio = 1.0f;
 
   VkDeviceQueueCreateInfo queueinfo = {
-      VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-      NULL,
-      0,
-      m_vulkanState.m_QueueFamilyIndex,
-      1,
-      &prio,
+      VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, NULL, 0,
+      m_vulkanState.m_QueueFamilyIndex,           1,    &prio,
   };
 
   vkEnumerateDeviceExtensionProperties(m_vulkanState.m_Gpu, NULL, &count, NULL);
@@ -767,18 +800,16 @@ ReplayStatus WrappedGXM::Initialise()
     strDeviceExtensions[strExtIndex] = enabledDeviceExtensions[strExtIndex].c_str();
   }
 
-  VkDeviceCreateInfo deviceinfo = {
-      VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      NULL,
-      0,
-      1,
-      &queueinfo,
-      0,
-      NULL,
-      (uint32_t)enabledDeviceExtensions.size(),
-      &strDeviceExtensions[0],
-      NULL
-  };
+  VkDeviceCreateInfo deviceinfo = {VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+                                   NULL,
+                                   0,
+                                   1,
+                                   &queueinfo,
+                                   0,
+                                   NULL,
+                                   (uint32_t)enabledDeviceExtensions.size(),
+                                   &strDeviceExtensions[0],
+                                   NULL};
 
   vkCreateDevice(m_vulkanState.m_Gpu, &deviceinfo, NULL, &m_vulkanState.m_Device);
 
@@ -791,12 +822,13 @@ ReplayStatus WrappedGXM::Initialise()
 
   m_InternalCmds.Reset();
 
-  if (m_InternalCmds.cmdpool == VK_NULL_HANDLE)
+  if(m_InternalCmds.cmdpool == VK_NULL_HANDLE)
   {
     VkCommandPoolCreateInfo poolInfo = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, NULL,
                                         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
                                         m_vulkanState.m_QueueFamilyIndex};
-    VkResult vkr = vkCreateCommandPool(m_vulkanState.m_Device, &poolInfo, NULL, &m_InternalCmds.cmdpool);
+    VkResult vkr =
+        vkCreateCommandPool(m_vulkanState.m_Device, &poolInfo, NULL, &m_InternalCmds.cmdpool);
     RDCASSERTEQUAL(vkr, VK_SUCCESS);
   }
 
@@ -832,8 +864,8 @@ uint32_t WrappedGXM::GetGPULocalMemoryIndex(uint32_t resourceRequiredBitmask)
 }
 
 uint32_t WrappedGXM::PhysicalDeviceData::GetMemoryIndex(uint32_t resourceRequiredBitmask,
-                                                           uint32_t allocRequiredProps,
-                                                           uint32_t allocUndesiredProps)
+                                                        uint32_t allocRequiredProps,
+                                                        uint32_t allocUndesiredProps)
 {
   uint32_t best = memProps.memoryTypeCount;
 
@@ -939,7 +971,7 @@ void WrappedGXM::FlushQ()
   // see comment in SubmitQ()
   if(m_vulkanState.m_Queue != VK_NULL_HANDLE)
   {
-    VkResult vkr =vkQueueWaitIdle(m_vulkanState.m_Queue);
+    VkResult vkr = vkQueueWaitIdle(m_vulkanState.m_Queue);
     RDCASSERTEQUAL(vkr, VK_SUCCESS);
   }
 
@@ -963,4 +995,33 @@ void WrappedGXM::FlushQ()
     m_InternalCmds.freesems.append(m_InternalCmds.submittedsems);
     m_InternalCmds.submittedsems.clear();
   }
+}
+
+void WrappedGXM::ReplayLog(uint32_t startEventID, uint32_t endEventID, ReplayLogType replayType)
+{
+  bool partial = true;
+
+  if(startEventID == 0 && (replayType == eReplay_WithoutDraw || replayType == eReplay_Full))
+  {
+    partial = false;
+  }
+
+  ReplayStatus status = ReplayStatus::Succeeded;
+
+  if(replayType == eReplay_Full)
+    status = ContextReplayLog(m_State, startEventID, endEventID, partial);
+  else if(replayType == eReplay_WithoutDraw)
+    status = ContextReplayLog(m_State, startEventID, RDCMAX(1U, endEventID) - 1, partial);
+  else if(replayType == eReplay_OnlyDraw)
+    status = ContextReplayLog(m_State, endEventID, endEventID, partial);
+  else
+    RDCFATAL("Unexpected replay type");
+
+  RDCASSERTEQUAL(status, ReplayStatus::Succeeded);
+}
+
+ReplayStatus WrappedGXM::ContextReplayLog(CaptureState readType, uint32_t startEventID,
+                                          uint32_t endEventID, bool partial)
+{
+  return ReplayStatus::Succeeded;
 }

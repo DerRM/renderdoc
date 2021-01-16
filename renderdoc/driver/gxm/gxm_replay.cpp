@@ -36,7 +36,10 @@ ReplayStatus GXMReplay::ReadLogInitialisation(RDCFile *rdc, bool storeStructured
   return m_pDriver->ReadLogInitialisation(rdc, storeStructuredBuffers);
 }
 
-void GXMReplay::ReplayLog(uint32_t endEventID, ReplayLogType replayType) {}
+void GXMReplay::ReplayLog(uint32_t endEventID, ReplayLogType replayType) 
+{
+  m_pDriver->ReplayLog(0, endEventID, replayType);
+}
 
 const SDFile &GXMReplay::GetStructuredFile()
 {
@@ -263,6 +266,7 @@ void GXMReplay::SetProxyBufferData(ResourceId bufid, byte *data, size_t dataSize
 void GXMReplay::RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &secondaryDraws,
                            const MeshDisplay &cfg)
 {
+  RDCDEBUG("test");
 }
 
 bool GXMReplay::RenderTexture(TextureDisplay cfg)
@@ -420,7 +424,10 @@ void GXMReplay::RenderCheckerboard()
           square.rect.extent.height = 0;
         }
 
-        squares.push_back(square);
+        if(square.rect.extent.width > 0 && square.rect.extent.height > 0)
+        {
+          squares.push_back(square);
+        }
       }
     }
 
@@ -666,24 +673,28 @@ rdcarray<EventUsage> GXMReplay::GetUsage(ResourceId id)
   return rdcarray<EventUsage>();
 }
 
-void GXMReplay::SavePipelineState(uint32_t eventId) {}
-
-const D3D11Pipe::State *GXMReplay::GetD3D11PipelineState()
+void GXMReplay::SavePipelineState(uint32_t eventId) 
 {
-  return nullptr;
-}
+  const GXMRenderState &state = m_pDriver->m_RenderState;
+  GXMResources &res = m_pDriver->m_Resources;
+  GXMPipe::State &pipe = m_PipelineState;
 
-const D3D12Pipe::State *GXMReplay::GetD3D12PipelineState()
-{
-  return nullptr;
-}
+  GXMResourceManager *rm = m_pDriver->GetResourceManager();
 
-const GLPipe::State *GXMReplay::GetGLPipelineState()
-{
-  return nullptr;
-}
+  pipe.vertexInput.indexBuffer = rm->GetOriginalID(state.ibuffer.buf);
 
-const VKPipe::State *GXMReplay::GetVulkanPipelineState()
-{
-  return nullptr;
+  const GXMVertexProgram& vertexProgram = res.m_VertexProgram[state.vprogram];
+
+  pipe.vertexInput.attributes.resize(vertexProgram.vertexAttrs.size());
+
+  for(size_t i = 0; i < vertexProgram.vertexAttrs.size(); i++)
+  {
+    pipe.vertexInput.attributes[i].format = ResourceFormat();
+  }
+
+  pipe.vertexInput.vertexBuffers.resize(state.vbuffers.size());
+  for(size_t i = 0; i < state.vbuffers.size(); i++)
+  {
+    pipe.vertexInput.vertexBuffers[i].resourceId = rm->GetOriginalID(state.vbuffers[i].buf);
+  }
 }

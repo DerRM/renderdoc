@@ -387,3 +387,15 @@ rdcstr DoStringise(const SceDisplayPixelFormat &el)
   }
   END_ENUM_STRINGISE();
 }
+
+template <>
+rdcstr DoStringise(const SceGxmMemoryAttribFlags &el)
+{
+  BEGIN_ENUM_STRINGISE(SceGxmMemoryAttribFlags);
+  {
+    STRINGISE_ENUM(SCE_GXM_MEMORY_ATTRIB_READ)
+    STRINGISE_ENUM(SCE_GXM_MEMORY_ATTRIB_WRITE)
+    STRINGISE_ENUM(SCE_GXM_MEMORY_ATTRIB_RW)
+  }
+  END_ENUM_STRINGISE();
+}

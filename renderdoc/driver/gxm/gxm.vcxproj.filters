@@ -65,6 +65,9 @@
     <ClInclude Include="gxm_vk_info.h">
       <Filter>Util</Filter>
     </ClInclude>
+    <ClInclude Include="gxm_state.h">
+      <Filter>Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gxm_driver.cpp">

@@ -457,6 +457,7 @@ public:
   const D3D12Pipe::State *GetD3D12PipelineState() { return &m_D3D12PipelineState; }
   const GLPipe::State *GetGLPipelineState() { return &m_GLPipelineState; }
   const VKPipe::State *GetVulkanPipelineState() { return &m_VulkanPipelineState; }
+  const GXMPipe::State *GetGXMPipelineState() { return &m_GXMPipelineState; }
   const SDFile &GetStructuredFile() { return m_StructuredFile; }
   IMPLEMENT_FUNCTION_PROXIED(void, FetchStructuredFile);
 
@@ -719,4 +720,5 @@ private:
   D3D12Pipe::State m_D3D12PipelineState;
   GLPipe::State m_GLPipelineState;
   VKPipe::State m_VulkanPipelineState;
+  GXMPipe::State m_GXMPipelineState;
 };

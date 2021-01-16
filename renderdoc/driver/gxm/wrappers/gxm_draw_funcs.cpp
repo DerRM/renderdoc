@@ -24,6 +24,8 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
   SERIALISE_ELEMENT(indexType);
   SERIALISE_ELEMENT(indexCount);
 
+  GXMRenderState &state = GetRenderState();
+
   uint32_t index_type_size = 0;
 
   if(indexType == SCE_GXM_INDEX_FORMAT_U16)
@@ -39,8 +41,16 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
 
   SERIALISE_ELEMENT_ARRAY(indexData, indexbufferSize);
 
+  ResourceId indexbuffer;
+  SERIALISE_ELEMENT(indexbuffer);
+
+  ResourceId mappedBuffer;
+  SERIALISE_ELEMENT(mappedBuffer);
+
   uint32_t streamCount;
   SERIALISE_ELEMENT(streamCount);
+
+  state.vbuffers.resize(streamCount);
 
   for(uint32_t stream_index = 0; stream_index < streamCount; ++stream_index)
   {
@@ -48,6 +58,11 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
     SERIALISE_ELEMENT(vertexBufferSize);
     const void *data;
     SERIALISE_ELEMENT_ARRAY(data, vertexBufferSize);
+
+    ResourceId vertexBuffer;
+    SERIALISE_ELEMENT(vertexBuffer);
+
+    SERIALISE_ELEMENT(mappedBuffer);
   }
 
   SERIALISE_CHECK_READ_ERRORS();

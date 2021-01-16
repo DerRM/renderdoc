@@ -28,6 +28,7 @@
 #include "d3d12_pipestate.h"
 #include "gl_pipestate.h"
 #include "vk_pipestate.h"
+#include "gxm_pipestate.h"
 
 DOCUMENT(R"(An API-agnostic view of the common aspects of the pipeline state. This allows simple
 access to e.g. find out the bound resources or vertex buffers, or certain pipeline state which is
@@ -46,13 +47,14 @@ public:
 #if defined(RENDERDOC_EXPORTS)
   // we initialise this internally only
   void SetStates(APIProperties props, const D3D11Pipe::State *d3d11, const D3D12Pipe::State *d3d12,
-                 const GLPipe::State *gl, const VKPipe::State *vk)
+                 const GLPipe::State *gl, const VKPipe::State *vk, const GXMPipe::State *gxm)
   {
     m_PipelineType = props.pipelineType;
     m_D3D11 = d3d11;
     m_D3D12 = d3d12;
     m_GL = gl;
     m_Vulkan = vk;
+    m_GXM = gxm;
   }
 #endif
 
@@ -63,7 +65,7 @@ public:
 )");
   bool IsCaptureLoaded() const
   {
-    return m_D3D11 != NULL || m_D3D12 != NULL || m_GL != NULL || m_Vulkan != NULL;
+    return m_D3D11 != NULL || m_D3D12 != NULL || m_GL != NULL || m_Vulkan != NULL || m_GXM != NULL;
   }
 
   DOCUMENT(R"(Determines whether or not a D3D11 capture is currently loaded.
@@ -104,6 +106,16 @@ public:
   bool IsCaptureVK() const
   {
     return IsCaptureLoaded() && m_PipelineType == GraphicsAPI::Vulkan && m_Vulkan != NULL;
+  }
+
+  DOCUMENT(R"(Determines whether or not a GXM capture is currently loaded.
+
+:return: A boolean indicating if a GXM capture is currently loaded.
+:rtype: ``bool``
+)");
+  bool IsCaptureGXM() const
+  {
+    return IsCaptureLoaded() && m_PipelineType == GraphicsAPI::GXM && m_GXM != NULL;
   }
 
   // add a bunch of generic properties that people can check to save having to see which pipeline
@@ -351,6 +363,7 @@ private:
   const D3D12Pipe::State *m_D3D12 = NULL;
   const GLPipe::State *m_GL = NULL;
   const VKPipe::State *m_Vulkan = NULL;
+  const GXMPipe::State *m_GXM = NULL;
   GraphicsAPI m_PipelineType = GraphicsAPI::D3D11;
 
   // helper functions

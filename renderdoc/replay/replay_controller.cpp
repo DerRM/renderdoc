@@ -2093,7 +2093,8 @@ void ReplayController::FetchPipelineState(uint32_t eventId)
   m_D3D12PipelineState = m_pDevice->GetD3D12PipelineState();
   m_GLPipelineState = m_pDevice->GetGLPipelineState();
   m_VulkanPipelineState = m_pDevice->GetVulkanPipelineState();
+  m_GXMPipelineState = m_pDevice->GetGXMPipelineState();
 
   m_PipeState.SetStates(m_APIProps, m_D3D11PipelineState, m_D3D12PipelineState, m_GLPipelineState,
-                        m_VulkanPipelineState);
+                        m_VulkanPipelineState, m_GXMPipelineState);
 }

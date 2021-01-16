@@ -107,6 +107,15 @@ void GXMReplay::OutputWindow::Create(WrappedGXM* driver, bool depth)
   VkSwapchainKHR old = swap;
   swap = VK_NULL_HANDLE;
 
+  VkSurfaceKHR oldsurf = surface;
+  surface = VK_NULL_HANDLE;
+
+  Destroy(driver);
+
+  surface = oldsurf;
+
+  fresh = true;
+
   if (surface == VK_NULL_HANDLE && m_WindowSystem != WindowingSystem::Headless)
   {
     CreateSurface(driver);

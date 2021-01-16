@@ -34,16 +34,23 @@ template <typename SerialiserType>
 bool WrappedGXM::Serialise_sceGxmMapMemory(SerialiserType &ser, void *base, SceSize size,
                                            SceGxmMemoryAttribFlags attr)
 {
-  SERIALISE_ELEMENT(base);
+  SERIALISE_ELEMENT_TYPED(uint32_t, base);
   SERIALISE_ELEMENT(size);
   SERIALISE_ELEMENT(attr);
 
   SERIALISE_CHECK_READ_ERRORS();
+
+  return true;
 }
 
-int WrappedGXM::sceGxmMapMemory(void *base, SceSize size, SceGxmMemoryAttribFlags attr)
+template <typename SerialiserType>
+bool WrappedGXM::Serialise_sceGxmUnmapMemory(SerialiserType &ser, void *base)
 {
-  return 0;
+  SERIALISE_ELEMENT_TYPED(uint32_t, base);
+
+  SERIALISE_CHECK_READ_ERRORS();
+
+  return true;
 }
 
 template <typename SerialiserType>
@@ -107,6 +114,9 @@ bool WrappedGXM::Serialise_sceGxmSetVertexStream(SerialiserType &ser, SceGxmCont
   return true;
 }
 
+INSTANTIATE_FUNCTION_SERIALISED(int, sceGxmMapMemory, void *base, SceSize size,
+                                SceGxmMemoryAttribFlags attr);
+INSTANTIATE_FUNCTION_SERIALISED(int, sceGxmUnmapMemory, void *base);
 INSTANTIATE_FUNCTION_SERIALISED(int, sceGxmReserveVertexDefaultUniformBuffer,
                                 SceGxmContext *context, void **uniformBuffer);
 INSTANTIATE_FUNCTION_SERIALISED(int, sceGxmReserveFragmentDefaultUniformBuffer,

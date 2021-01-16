@@ -244,6 +244,7 @@ private:
   const D3D12Pipe::State *m_D3D12PipelineState;
   const GLPipe::State *m_GLPipelineState;
   const VKPipe::State *m_VulkanPipelineState;
+  const GXMPipe::State *m_GXMPipelineState;
   PipeState m_PipeState;
 
   rdcarray<ReplayOutput *> m_Outputs;
