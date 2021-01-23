@@ -159,6 +159,12 @@ private:
   template <typename SerialiserType>
   bool Serialise_ContextConfiguration(SerialiserType &ser, void *ctx);
 
+  template <typename SerialiserType>
+  bool Serialise_InitBufferResource(SerialiserType &ser);
+
+  template <typename SerialiserType>
+  bool Serialise_CaptureScope(SerialiserType &ser);
+
   void AddRequiredExtensions(bool instance, rdcarray<rdcstr> &extensionList,
                              const std::set<rdcstr> &supportedExtensions);
 

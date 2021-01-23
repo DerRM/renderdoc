@@ -279,6 +279,8 @@ enum class GXMChunk : uint32_t
 
   ContextConfiguration,
 
+  InitBufferResources,
+
   Max,
 };
 
@@ -289,6 +291,13 @@ enum class GXMType : uint32_t {
   SceGxmVertexProgram,
   SceGxmFragmentProgram,
   SceGXMUnknown
+};
+
+enum class GXMBufferType : uint32_t {
+  SceGxmMappedBuffer,
+  SceGxmVertexBuffer,
+  SceGxmIndexBuffer,
+  SceGxmTextureBuffer
 };
 
 extern "C" {

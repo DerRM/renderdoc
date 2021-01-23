@@ -399,3 +399,16 @@ rdcstr DoStringise(const SceGxmMemoryAttribFlags &el)
   }
   END_ENUM_STRINGISE();
 }
+
+template <>
+rdcstr DoStringise(const GXMBufferType &el)
+{
+  BEGIN_ENUM_STRINGISE(GXMBufferType);
+  {
+    STRINGISE_ENUM(GXMBufferType::SceGxmMappedBuffer)
+    STRINGISE_ENUM(GXMBufferType::SceGxmVertexBuffer)
+    STRINGISE_ENUM(GXMBufferType::SceGxmIndexBuffer)
+    STRINGISE_ENUM(GXMBufferType::SceGxmTextureBuffer)
+  }
+  END_ENUM_STRINGISE();
+}

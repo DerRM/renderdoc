@@ -112,11 +112,6 @@ ReplayStatus WrappedGXM::ReadLogInitialisation(RDCFile *rdc, bool storeStructure
 
     uint64_t offsetEnd = reader->GetOffset();
 
-    if(!m_AddedDrawcall)
-      AddEvent();
-
-    m_AddedDrawcall = false;
-
     if((SystemChunk)context == SystemChunk::CaptureScope)
     {
       GetReplay()->WriteFrameRecord().frameInfo.fileOffset = offsetStart;
@@ -124,6 +119,11 @@ ReplayStatus WrappedGXM::ReadLogInitialisation(RDCFile *rdc, bool storeStructure
       frameDataSize = reader->GetSize() - reader->GetOffset();
 
       m_FrameReader = new StreamReader(reader, frameDataSize);
+
+      ReplayStatus status = ContextReplayLog(m_State, 0, 0, false);
+
+      if(status != ReplayStatus::Succeeded)
+        return status;
     }
 
     chunkInfos[context].totalsize += offsetEnd - offsetStart;
@@ -131,8 +131,6 @@ ReplayStatus WrappedGXM::ReadLogInitialisation(RDCFile *rdc, bool storeStructure
 
     if((SystemChunk)context == SystemChunk::CaptureScope || reader->IsErrored() || reader->AtEnd())
       break;
-
-    m_CurEventID++;
   }
 
   m_StructuredFile->Swap(m_StoredStructuredData);
@@ -223,20 +221,56 @@ bool WrappedGXM::Serialise_ContextConfiguration(SerialiserType &ser, void *ctx)
   ResourceId framebuffer;
   SERIALISE_ELEMENT(framebuffer);
 
-  GXMResource res = FramebufferRes();
-  m_ResourceManager->RegisterResource(res);
-  GetResourceManager()->AddLiveResource(framebuffer, res);
+  if(!GetResourceManager()->HasLiveResource(framebuffer))
+  {
+    GXMResource res = FramebufferRes();
+    m_ResourceManager->RegisterResource(res);
+    GetResourceManager()->AddLiveResource(framebuffer, res);
 
-  AddResource(framebuffer, ResourceType::SwapchainImage, "Backbuffer Color");
+    AddResource(framebuffer, ResourceType::SwapchainImage, "Backbuffer Color");
+  }
 
   (void)params;
 
   return true;
 }
 
+template <typename SerialiserType>
+bool WrappedGXM::Serialise_InitBufferResource(SerialiserType &ser)
+{
+  GXMBufferType type;
+  SERIALISE_ELEMENT(type);
+  uint32_t addr;
+  SERIALISE_ELEMENT(addr);
+  uint32_t size;
+  SERIALISE_ELEMENT(size);
+  ResourceId buffer;
+  SERIALISE_ELEMENT(buffer);
+
+  return true;
+}
+
+template <typename SerialiserType>
+bool WrappedGXM::Serialise_CaptureScope(SerialiserType &ser)
+{
+  uint32_t framecount;
+  SERIALISE_ELEMENT(framecount);
+  return true;
+}
+
 bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
 {
   m_AddedDrawcall = false;
+
+  SystemChunk system = (SystemChunk)chunk;
+  if(system == SystemChunk::CaptureScope)
+  {
+    return Serialise_CaptureScope(ser);
+  }
+  else if(system == SystemChunk::CaptureEnd)
+  {
+    return true;
+  }
 
   switch(chunk)
   {
@@ -518,6 +552,7 @@ bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
     case GXMChunk::sceGxmVertexProgramGetProgram: break;
     case GXMChunk::sceGxmWaitEvent: break;
     case GXMChunk::ContextConfiguration: return Serialise_ContextConfiguration(ser, NULL);
+    case GXMChunk::InitBufferResources: return Serialise_InitBufferResource(ser);
     case GXMChunk::Max: break;
     default: break;
   }
@@ -1003,8 +1038,11 @@ void WrappedGXM::ReplayLog(uint32_t startEventID, uint32_t endEventID, ReplayLog
 
   if(startEventID == 0 && (replayType == eReplay_WithoutDraw || replayType == eReplay_Full))
   {
+    startEventID = 1;
     partial = false;
   }
+
+  m_State = CaptureState::ActiveReplaying;
 
   ReplayStatus status = ReplayStatus::Succeeded;
 
@@ -1023,5 +1061,93 @@ void WrappedGXM::ReplayLog(uint32_t startEventID, uint32_t endEventID, ReplayLog
 ReplayStatus WrappedGXM::ContextReplayLog(CaptureState readType, uint32_t startEventID,
                                           uint32_t endEventID, bool partial)
 {
+  m_FrameReader->SetOffset(0);
+
+  ReadSerialiser ser(m_FrameReader, Ownership::Nothing);
+
+  SDFile *prevFile = m_StructuredFile;
+
+  if(IsLoading(m_State) || IsStructuredExporting(m_State))
+  {
+    ser.ConfigureStructuredExport(&GetChunkName, IsStructuredExporting(m_State));
+
+    ser.GetStructuredFile().Swap(*m_StructuredFile);
+
+    m_StructuredFile = &ser.GetStructuredFile();
+  }
+
+  SystemChunk header = ser.ReadChunk<SystemChunk>();
+  RDCASSERTEQUAL(header, SystemChunk::CaptureBegin);
+
+  ser.EndChunk();
+
+   m_CurEvents.clear();
+
+  if(IsActiveReplaying(m_State))
+  {
+    size_t idx = startEventID;
+    while(idx < m_Events.size() - 1 && m_Events[idx].eventId == 0)
+      idx++;
+
+    APIEvent &ev = m_Events[RDCMIN(idx, m_Events.size() - 1)];
+
+    m_CurEventID = ev.eventId;
+    if(partial)
+      ser.GetReader()->SetOffset(ev.fileOffset);
+  }
+  else
+  {
+    m_CurEventID = 1;
+    m_CurDrawcallID = 1;
+  }
+
+  for(;;)
+  {
+    if(IsActiveReplaying(m_State) && m_CurEventID > endEventID)
+    {
+      // we can just break out if we've done all the events desired.
+      break;
+    }
+
+    GXMChunk chunktype = ser.ReadChunk<GXMChunk>();
+
+    if(ser.GetReader()->IsErrored())
+      return ReplayStatus::APIDataCorrupted;
+
+    bool success = ProcessChunk(ser, chunktype);
+
+    ser.EndChunk();
+
+    if(ser.GetReader()->IsErrored())
+      return ReplayStatus::APIDataCorrupted;
+
+    if(!success)
+      return ReplayStatus::APIReplayFailed;    // TODO use variable
+
+    if((SystemChunk)chunktype == SystemChunk::CaptureEnd)
+      break;
+
+    if(IsLoading(m_State))
+    {
+      if(!m_AddedDrawcall)
+        AddEvent();
+    }
+
+    m_CurEventID++;
+  }
+  
+  // swap the structure back now that we've accumulated the frame as well.
+  if(IsLoading(m_State) || IsStructuredExporting(m_State))
+    ser.GetStructuredFile().Swap(*prevFile);
+
+  m_StructuredFile = prevFile;
+
+  if(IsLoading(m_State))
+  {
+    //GetReplay()->WriteFrameRecord().drawcallList = m_ParentDrawcall.children;
+
+    //SetupDrawcallPointers(m_DrawcallStack, GetReplay()->WriteFrameRecord().drawcallList);
+  }
+
   return ReplayStatus::Succeeded;
 }

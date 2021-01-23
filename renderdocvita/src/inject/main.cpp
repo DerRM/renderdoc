@@ -96,12 +96,14 @@ SceDisplayFrameBuf g_framebuffer;
 
 struct MappedMemory
 {
-    int64_t resId;
-    void* addr;
+    GXMBufferType bufferType;
+    const void* addr;
     uint32_t size;
+    uint32_t referenced;
+    int64_t resId;
 };
 
-#define MAX_MAPPED_MEMORY_COUNT 32
+#define MAX_MAPPED_MEMORY_COUNT 1024
 MappedMemory* g_memoryArray = NULL;
 uint32_t g_mappedMemoryCount = 0;
 
@@ -1025,6 +1027,30 @@ CREATE_PATCHED_CALL(int, sceGxmDestroyRenderTarget, SceGxmRenderTarget *renderTa
     return TAI_NEXT(sceGxmDestroyRenderTarget, sceGxmDestroyRenderTargetRef, renderTarget);
 }
 
+static void serializeBuffers()
+{
+    uint32_t chunkSize = 0;
+    
+    LOG("mapped memory count: %" PRIu32 "\n", g_mappedMemoryCount);
+
+    for (uint32_t buffer_index = 0; buffer_index < g_mappedMemoryCount; ++buffer_index) {
+        if (g_memoryArray[buffer_index].referenced) {
+            MappedMemory &buffer = g_memoryArray[buffer_index];
+            GXMChunk type = GXMChunk::InitBufferResources;
+            g_fileoffset += g_file.write(type);
+            g_fileoffset += g_file.write(chunkSize);
+            g_fileoffset += g_file.write(buffer.bufferType);
+            g_fileoffset += g_file.write(buffer.addr);
+            g_fileoffset += g_file.write(buffer.size);
+            g_fileoffset += g_file.write(buffer.resId);
+
+            g_fileoffset += ALIGN_TO_64(g_fileoffset);
+
+            LOG("referenced buffer: %" PRIi32 "\n", buffer_index);
+        }
+    }
+}
+
 char fname[256];
 
 CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer, SceGxmSyncObject *newBuffer, const void *callbackData)
@@ -1049,37 +1075,15 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
         g_log = 0;
         g_log_display = 1;
         g_logFrameCount = g_frameCount;
+        
+        uint32_t chunkSize = 0;
+
+        GXMChunk type = (GXMChunk)6; // SystemChunk::CaptureEnd
+        g_fileoffset += g_file.write(type);
+        g_fileoffset += g_file.write(chunkSize);
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
 
         g_file.close();
-
-        struct test_t {
-            uint64_t file_size;
-            uint64_t file_size_compressed;
-        };
-
-        struct test_t test;
-        test.file_size = g_fileoffset;
-        test.file_size_compressed = g_fileoffset;
-
-        uint32_t offset = sizeof(struct FileHeader) + offsetof(struct BinaryThumbnail, data) + offsetof(struct CaptureMetaData, driverName) + 4 + offsetof(struct BinarySectionHeader, sectionCompressedLength);
-        g_file.replaceData(offset, sizeof(test_t), &test, sizeof(test_t));
-        g_file.close();
-
-        LOG("g_fileoffset: %" PRIu64 "\n", g_fileoffset);
-        g_fileoffset = 0;
-        //g_fd = -1;
-    }
-
-    ++g_frameCount;
-
-    if (g_capture) {
-        // clear all display queue calls to make sure the current 
-        // framebuffer is really the one we currently have rendered to
-        sceGxmDisplayQueueFinish();
-
-        g_capture = 0;
-
-        g_log = 1;
 
         SceDateTime time;
 		sceRtcGetCurrentClockLocalTime(&time);
@@ -1123,9 +1127,72 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
         g_file.write(&section, offsetof(struct BinarySectionHeader, name));
         g_file.write("FrameCapture", section.sectionNameLength);
 
-        uint32_t chunkSize = 0;
+        uint64_t drawcallfilesize = g_fileoffset;
+        LOG("drawcallfilesize: %" PRIu64 "\n", drawcallfilesize);
+
+        g_fileoffset = 0;
 
         // TODO: serialize used resources here
+        serializeBuffers();
+
+        uint64_t bufferfilesize = g_fileoffset;
+        LOG("bufferfilesize: %" PRIu64 "\n", bufferfilesize);
+
+        File tmp_file;
+        tmp_file.open("ux0:/data/renderdoc/drawcalls.bin");
+
+        uint8_t buffer[CHUNK_SIZE];
+
+        uint32_t offset = 0;
+        uint32_t buffer_size = 0;
+        while(offset < drawcallfilesize) {
+
+            if (drawcallfilesize - offset > CHUNK_SIZE) 
+                buffer_size = CHUNK_SIZE;
+            else
+                buffer_size = drawcallfilesize - offset;
+        
+            tmp_file.read(buffer, buffer_size);
+            g_file.write(buffer, buffer_size);
+
+            offset += buffer_size;
+        }
+
+        //g_file.close();
+        tmp_file.close();
+
+        struct test_t {
+            uint64_t file_size;
+            uint64_t file_size_compressed;
+        };
+
+        struct test_t test;
+        test.file_size = drawcallfilesize + bufferfilesize;
+        test.file_size_compressed = drawcallfilesize + bufferfilesize;
+
+        offset = sizeof(struct FileHeader) + offsetof(struct BinaryThumbnail, data) + offsetof(struct CaptureMetaData, driverName) + 4 + offsetof(struct BinarySectionHeader, sectionCompressedLength);
+        g_file.replaceData(offset, sizeof(test_t), &test, sizeof(test_t));
+        g_file.close();
+
+        LOG("file size without header: %" PRIu64 "\n", drawcallfilesize + bufferfilesize);
+        g_fileoffset = 0;
+        //g_fd = -1;
+    }
+
+    ++g_frameCount;
+
+    if (g_capture) {
+        // clear all display queue calls to make sure the current 
+        // framebuffer is really the one we currently have rendered to
+        sceGxmDisplayQueueFinish();
+
+        g_capture = 0;
+
+        g_log = 1;
+
+        g_file.open("ux0:/data/renderdoc/drawcalls.bin");
+
+        uint32_t chunkSize = 0;
 
         GXMChunk type = (GXMChunk)5; // SystemChunk::CaptureScope
         g_fileoffset += g_file.write(type);
@@ -1223,12 +1290,26 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
 
         g_fileoffset += ALIGN_TO_64(g_fileoffset);
         g_fileoffset += g_file.write(indexData, indexbufferSize);
-        g_fileoffset += g_file.write(++g_resourceid);
+        uint64_t resId = ++g_resourceid;
+        g_fileoffset += g_file.write(resId);
+
+        if (g_mappedMemoryCount + 1 < MAX_MAPPED_MEMORY_COUNT) {
+            g_memoryArray[g_mappedMemoryCount].bufferType = GXMBufferType::SceGxmIndexBuffer;
+            g_memoryArray[g_mappedMemoryCount].resId = resId;
+            g_memoryArray[g_mappedMemoryCount].addr = indexData;
+            g_memoryArray[g_mappedMemoryCount].size = indexbufferSize;
+            g_memoryArray[g_mappedMemoryCount].referenced = 1;
+            ++g_mappedMemoryCount;
+        }
+        else {
+            LOG("Warn: too much mapped memory blocks\n");
+        }
 
         bool found = false;
         for (uint32_t memory_index = 0; memory_index < g_mappedMemoryCount; ++memory_index) {
             if (indexData >= g_memoryArray[memory_index].addr && ((uintptr_t)indexData + indexbufferSize) < ((uintptr_t)g_memoryArray[memory_index].addr + g_memoryArray[memory_index].size)) {
                 g_fileoffset += g_file.write(g_memoryArray[memory_index].resId);
+                g_memoryArray[memory_index].referenced = 1;
                 found = true;
             }
         }
@@ -1254,12 +1335,26 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
 
             g_fileoffset += ALIGN_TO_64(g_fileoffset);
             g_fileoffset += g_file.write(g_activeVertexStreams[vertexRes.streams[stream_index].indexSource], vertexBufferSize);
-            g_fileoffset += g_file.write(++g_resourceid);
+            resId = ++g_resourceid;
+            g_fileoffset += g_file.write(resId);
+
+            if (g_mappedMemoryCount + 1 < MAX_MAPPED_MEMORY_COUNT) {
+                g_memoryArray[g_mappedMemoryCount].bufferType = GXMBufferType::SceGxmVertexBuffer;
+                g_memoryArray[g_mappedMemoryCount].resId = resId;
+                g_memoryArray[g_mappedMemoryCount].addr = g_activeVertexStreams[vertexRes.streams[stream_index].indexSource];
+                g_memoryArray[g_mappedMemoryCount].size = vertexBufferSize;
+                g_memoryArray[g_mappedMemoryCount].referenced = 1;
+                ++g_mappedMemoryCount;
+            }
+            else {
+                LOG("Warn: too much mapped memory blocks\n");
+            }
 
             found = false;
             for (uint32_t memory_index = 0; memory_index < g_mappedMemoryCount; ++memory_index) {
                 if (g_activeVertexStreams[vertexRes.streams[stream_index].indexSource] >= g_memoryArray[memory_index].addr && ((uintptr_t)g_activeVertexStreams[vertexRes.streams[stream_index].indexSource] + vertexBufferSize) < ((uintptr_t)g_memoryArray[memory_index].addr + g_memoryArray[memory_index].size)) {
                     g_fileoffset += g_file.write(g_memoryArray[memory_index].resId);
+                    g_memoryArray[memory_index].referenced = 1;
                     found = true;
                 }
             }
@@ -1481,6 +1576,7 @@ CREATE_PATCHED_CALL(int, sceGxmMapMemory, void *base, SceSize size, SceGxmMemory
     }
 
     if (g_mappedMemoryCount + 1 < MAX_MAPPED_MEMORY_COUNT) {
+        g_memoryArray[g_mappedMemoryCount].bufferType = GXMBufferType::SceGxmMappedBuffer;
         g_memoryArray[g_mappedMemoryCount].resId = resid;
         g_memoryArray[g_mappedMemoryCount].addr = base;
         g_memoryArray[g_mappedMemoryCount].size = size;
@@ -3293,6 +3389,12 @@ int module_start(SceSize args, void *argp) {
     sceIoMkdir("ux0:/data/renderdoc", 0777);
     sceIoRemove("ux0:/data/renderdoc/resources.bin");
     SceUID resource_fd = sceIoOpen("ux0:/data/renderdoc/resources.bin", SCE_O_RDWR | SCE_O_CREAT, 0777);
+    sceIoWrite(resource_fd, 0, 0);
+    sceIoClose(resource_fd);
+    resource_fd = -1;
+
+    sceIoRemove("ux0:/data/renderdoc/drawcalls.bin");
+    resource_fd = sceIoOpen("ux0:/data/renderdoc/drawcalls.bin", SCE_O_RDWR | SCE_O_CREAT, 0777);
     sceIoWrite(resource_fd, 0, 0);
     sceIoClose(resource_fd);
     resource_fd = -1;

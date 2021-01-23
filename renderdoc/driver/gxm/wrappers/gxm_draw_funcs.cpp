@@ -91,8 +91,6 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
       draw.topology = MakePrimitiveTopology(primType);
       draw.indexByteWidth = IdxSize;
 
-      draw.eventId = m_CurEventID;
-
       AddDrawcall(draw);
     }
   }

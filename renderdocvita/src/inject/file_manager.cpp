@@ -204,8 +204,15 @@ void File::insertData(uint32_t file_pos, void* data, uint32_t size) {
 }
 
 void File::replaceData(uint32_t file_pos, uint32_t old_size, void* new_data, uint32_t new_size) {
-    removeData(file_pos, old_size);
-    insertData(file_pos, new_data, new_size);
+    if (old_size == new_size) {
+        close();
+        m_fd = sceIoOpen(m_path, SCE_O_RDWR, 0777);
+        sceIoPwrite(m_fd, new_data, new_size, file_pos);
+    }
+    else {
+        removeData(file_pos, old_size);
+        insertData(file_pos, new_data, new_size);
+    }
 }
 
 void File::flush() {
