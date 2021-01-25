@@ -44,6 +44,27 @@ bool WrappedGXM::Serialise_sceGxmSetVertexProgram(SerialiserType &ser, SceGxmCon
   SERIALISE_ELEMENT_TYPED(uint32_t, context);
   SERIALISE_ELEMENT_TYPED(uint32_t, vertexProgram);
 
+  uint32_t attributeCount;
+  SERIALISE_ELEMENT(attributeCount);
+
+  for (uint32_t attrib_index = 0; attrib_index < attributeCount; ++attrib_index)
+  {
+    SceGxmAttributeFormat format;
+    SERIALISE_ELEMENT(format);
+
+    uint8_t componentCount;
+    SERIALISE_ELEMENT(componentCount);
+
+    uint16_t offset;
+    SERIALISE_ELEMENT(offset);
+
+    uint16_t streamIndex;
+    SERIALISE_ELEMENT(streamIndex);
+
+    uint16_t regIndex;
+    SERIALISE_ELEMENT(regIndex);
+  }
+
   RDCLOG("sceGxmSetVertexProgram(context: 0x%x, vertexProgram: 0x%x)", context, vertexProgram);
 
   return true;

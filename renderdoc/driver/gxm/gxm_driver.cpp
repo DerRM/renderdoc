@@ -89,7 +89,7 @@ ReplayStatus WrappedGXM::ReadLogInitialisation(RDCFile *rdc, bool storeStructure
 
   for(;;)
   {
-    uint64_t offsetStart = m_CurChunkOffset = ser.GetReader()->GetOffset();
+    uint64_t offsetStart = reader->GetOffset();
 
     GXMChunk context = ser.ReadChunk<GXMChunk>();
 
@@ -246,6 +246,48 @@ bool WrappedGXM::Serialise_InitBufferResource(SerialiserType &ser)
   SERIALISE_ELEMENT(size);
   ResourceId buffer;
   SERIALISE_ELEMENT(buffer);
+
+  SERIALISE_CHECK_READ_ERRORS();
+
+  if(IsReplayingAndReading())
+  {
+    if(type == GXMBufferType::SceGxmMappedBuffer)
+    {
+      VkBufferCreateInfo bufferInfo = {};
+      bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+      bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+      bufferInfo.size = size;
+      bufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+
+      VkBuffer vkbuffer;
+      vkCreateBuffer(m_vulkanState.m_Device, &bufferInfo, NULL, &vkbuffer);
+
+      GXMResource res = MappedBufferRes(addr, size, vkbuffer);
+      ResourceId live = m_ResourceManager->RegisterResource(res);
+      GetResourceManager()->AddLiveResource(buffer, res);
+
+      GXMResource livegxm = GetResourceManager()->GetLiveResource(buffer);
+      (void)livegxm;
+
+      AddResource(buffer, ResourceType::Buffer, "Mapped Buffer");
+    }
+    else
+    {
+      GXMResource res = GetResourceManager()->FindInBuffer(size, addr);
+      ResourceId liveid = GetResourceManager()->GetID(res);
+      ResourceId origId = GetResourceManager()->GetOriginalID(liveid);
+
+      GetReplay()->GetResourceDesc(origId).derivedResources.push_back(buffer);
+      GetReplay()->GetResourceDesc(buffer).parentResources.push_back(origId);
+
+      if(type == GXMBufferType::SceGxmIndexBuffer)
+        AddResource(buffer, ResourceType::Buffer, "Index Buffer");
+      else if(type == GXMBufferType::SceGxmVertexBuffer)
+        AddResource(buffer, ResourceType::Buffer, "Vertex Buffer");
+    }
+
+  }
 
   return true;
 }
@@ -1079,9 +1121,12 @@ ReplayStatus WrappedGXM::ContextReplayLog(CaptureState readType, uint32_t startE
   SystemChunk header = ser.ReadChunk<SystemChunk>();
   RDCASSERTEQUAL(header, SystemChunk::CaptureBegin);
 
+  if(partial)
+    ser.SkipCurrentChunk();
+
   ser.EndChunk();
 
-   m_CurEvents.clear();
+  m_CurEvents.clear();
 
   if(IsActiveReplaying(m_State))
   {
@@ -1109,6 +1154,8 @@ ReplayStatus WrappedGXM::ContextReplayLog(CaptureState readType, uint32_t startE
       break;
     }
 
+    m_CurChunkOffset = ser.GetReader()->GetOffset();
+
     GXMChunk chunktype = ser.ReadChunk<GXMChunk>();
 
     if(ser.GetReader()->IsErrored())
@@ -1135,7 +1182,7 @@ ReplayStatus WrappedGXM::ContextReplayLog(CaptureState readType, uint32_t startE
 
     m_CurEventID++;
   }
-  
+
   // swap the structure back now that we've accumulated the frame as well.
   if(IsLoading(m_State) || IsStructuredExporting(m_State))
     ser.GetStructuredFile().Swap(*prevFile);
@@ -1144,9 +1191,9 @@ ReplayStatus WrappedGXM::ContextReplayLog(CaptureState readType, uint32_t startE
 
   if(IsLoading(m_State))
   {
-    //GetReplay()->WriteFrameRecord().drawcallList = m_ParentDrawcall.children;
+    // GetReplay()->WriteFrameRecord().drawcallList = m_ParentDrawcall.children;
 
-    //SetupDrawcallPointers(m_DrawcallStack, GetReplay()->WriteFrameRecord().drawcallList);
+    // SetupDrawcallPointers(m_DrawcallStack, GetReplay()->WriteFrameRecord().drawcallList);
   }
 
   return ReplayStatus::Succeeded;

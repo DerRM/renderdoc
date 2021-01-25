@@ -38,7 +38,9 @@ enum GXMNamespace
   eResUnknown = 0,
   eResTexture,
   eResFramebuffer,
-  eResBuffer,
+  eResMappedBuffer,
+  eResIndexBuffer,
+  eResVertexBuffer,
   eResShader,
   eResProgram,
 };
@@ -48,29 +50,46 @@ struct GXMResource
   GXMResource()
   {
     Namespace = eResUnknown;
+    addr = 0;
+    size = 0;
   }
   GXMResource(NullInitialiser)
   {
     Namespace = eResUnknown;
+    addr = 0;
+    size = 0;
   }
   GXMResource(GXMNamespace n)
   {
     Namespace = n;
+    addr = 0;
+    size = 0;
   }
 
   GXMNamespace Namespace;
 
   bool operator==(const GXMResource &o) const
   {
-    return Namespace == o.Namespace;
+    return Namespace == o.Namespace && addr == o.addr && size == o.size;
   }
 
   bool operator!=(const GXMResource &o) const { return !(*this == o); }
   bool operator<(const GXMResource &o) const
   {
-    //if(Namespace != o.Namespace)
+    if(Namespace != o.Namespace)
       return Namespace < o.Namespace;
+    if(addr != o.addr)
+      return addr < o.addr;
+    return size < o.size;
   }
+
+  uint32_t addr;
+  uint32_t size;
+
+  VkBuffer buffer;
+  VkImage image;
+  VkShaderModule shader;
+  VkPipeline pipeline;
 };
 
 inline GXMResource TextureRes()
@@ -81,10 +100,36 @@ inline GXMResource FramebufferRes()
 {
   return GXMResource(eResFramebuffer);
 }
-inline GXMResource BufferRes()
+inline GXMResource MappedBufferRes(uint32_t buffer_addr, uint32_t buffer_size, VkBuffer buffer)
 {
-  return GXMResource(eResBuffer);
+  GXMResource res(eResMappedBuffer);
+  res.addr = buffer_addr;
+  res.size = buffer_size;
+  res.buffer = buffer;
+  
+  return res;
 }
+
+inline GXMResource IndexBufferRes(uint32_t buffer_addr, uint32_t buffer_size, VkBuffer buffer)
+{
+  GXMResource res(eResIndexBuffer);
+  res.addr = buffer_addr;
+  res.size = buffer_size;
+  res.buffer = buffer;
+
+  return res;
+}
+
+inline GXMResource VertexBufferRes(uint32_t buffer_addr, uint32_t buffer_size, VkBuffer buffer)
+{
+  GXMResource res(eResVertexBuffer);
+  res.addr = buffer_addr;
+  res.size = buffer_size;
+  res.buffer = buffer;
+
+  return res;
+}
+
 inline GXMResource ShaderRes()
 {
   return GXMResource(eResShader);

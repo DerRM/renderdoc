@@ -1,6 +1,7 @@
 #include <inttypes.h>
 
 #include "../gxm_driver.h"
+#include "../gxm_replay.h"
 #include "common/common.h"
 #include "strings/string_utils.h"
 
@@ -44,8 +45,9 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
   ResourceId indexbuffer;
   SERIALISE_ELEMENT(indexbuffer);
 
-  ResourceId mappedBuffer;
-  SERIALISE_ELEMENT(mappedBuffer);
+  ResourceId parentId = GetReplay()->GetResourceDesc(indexbuffer).parentResources[0];
+  GXMResource res = GetResourceManager()->GetLiveResource(parentId);
+  (void)res;
 
   uint32_t streamCount;
   SERIALISE_ELEMENT(streamCount);
@@ -62,7 +64,9 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
     ResourceId vertexBuffer;
     SERIALISE_ELEMENT(vertexBuffer);
 
-    SERIALISE_ELEMENT(mappedBuffer);
+    ResourceId vertexParentId = GetReplay()->GetResourceDesc(vertexBuffer).parentResources[0];
+    GXMResource vertexRes = GetResourceManager()->GetLiveResource(vertexParentId);
+    (void)vertexRes;
   }
 
   SERIALISE_CHECK_READ_ERRORS();

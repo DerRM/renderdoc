@@ -108,7 +108,15 @@ MappedMemory* g_memoryArray = NULL;
 uint32_t g_mappedMemoryCount = 0;
 
 const SceGxmVertexProgram * g_activeVertexProgram = NULL;
-const void * g_activeVertexStreams[SCE_GXM_MAX_VERTEX_STREAMS] = { NULL };
+struct VertexStream
+{
+    const void* dataPtr;
+    uint32_t stride;
+    uint32_t indexSource;
+};
+
+VertexStream g_activeVertexStreams[SCE_GXM_MAX_VERTEX_STREAMS] = { 0 };
+uint32_t g_activeStreamCount = 0;
 
 const uint32_t ALIGNMENT = 64;
 const uint8_t g_alignmentBytes[ALIGNMENT] = { 0 };
@@ -1244,20 +1252,6 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
         g_fileoffset += g_file.write(indexType);
         g_fileoffset += g_file.write(indexCount);
 
-        VertexProgramResource vertexRes;
-        g_resource_manager.find(GXMType::SceGxmVertexProgram, (uint32_t)g_activeVertexProgram, &vertexRes);
-
-        LOGD("sceGxmDraw, active vertex program: attribute count %" PRIu32 "\n", vertexRes.attributeCount);
-        for (uint32_t attribute_index = 0; attribute_index < vertexRes.attributeCount; ++attribute_index) {
-            SceGxmVertexAttribute& attribute = vertexRes.attributes[attribute_index];
-            LOGD("\tattribute: stream index: %" PRIu16 ", offset: %" PRIu16 ", format %s, componentCount: %" PRIu8 ", regIndex: %" PRIu16 "\n", attribute.streamIndex, attribute.offset, attributeFormat2str(attribute.format), attribute.componentCount, attribute.regIndex);
-        }
-        LOGD("sceGxmDraw, streamCount: %" PRIu32 "\n", vertexRes.streamCount);
-        for (uint32_t stream_index = 0; stream_index < vertexRes.streamCount; ++stream_index) {
-            SceGxmVertexStream& stream = vertexRes.streams[stream_index];
-            LOGD("\tstream: stride %" PRIu16 ", indexSource: %" PRIu16 "\n", stream.stride, stream.indexSource);
-        }
-
         uint32_t max_index = 0;
         uint32_t index_type_size = 0;
 
@@ -1290,35 +1284,45 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
 
         g_fileoffset += ALIGN_TO_64(g_fileoffset);
         g_fileoffset += g_file.write(indexData, indexbufferSize);
-        uint64_t resId = ++g_resourceid;
-        g_fileoffset += g_file.write(resId);
-
-        if (g_mappedMemoryCount + 1 < MAX_MAPPED_MEMORY_COUNT) {
-            g_memoryArray[g_mappedMemoryCount].bufferType = GXMBufferType::SceGxmIndexBuffer;
-            g_memoryArray[g_mappedMemoryCount].resId = resId;
-            g_memoryArray[g_mappedMemoryCount].addr = indexData;
-            g_memoryArray[g_mappedMemoryCount].size = indexbufferSize;
-            g_memoryArray[g_mappedMemoryCount].referenced = 1;
-            ++g_mappedMemoryCount;
-        }
-        else {
-            LOG("Warn: too much mapped memory blocks\n");
-        }
-
-        bool found = false;
+        
         for (uint32_t memory_index = 0; memory_index < g_mappedMemoryCount; ++memory_index) {
             if (indexData >= g_memoryArray[memory_index].addr && ((uintptr_t)indexData + indexbufferSize) < ((uintptr_t)g_memoryArray[memory_index].addr + g_memoryArray[memory_index].size)) {
-                g_fileoffset += g_file.write(g_memoryArray[memory_index].resId);
                 g_memoryArray[memory_index].referenced = 1;
-                found = true;
+                break;
             }
         }
 
-        if (!found) {
-            LOG("WARN: could not mapped memory for index buffer\n");
-            g_fileoffset += g_file.write((uint64_t)0);
+        uint64_t resId = 0;
+        for (uint32_t memory_index = 0; memory_index < g_mappedMemoryCount; ++memory_index) {
+            if (indexData == g_memoryArray[memory_index].addr && indexbufferSize == g_memoryArray[memory_index].size)
+            {
+                resId = g_memoryArray[memory_index].resId;
+                break;
+            }
         }
 
+        if (resId != 0)
+        {
+            g_fileoffset += g_file.write(resId);
+        }
+        else
+        {
+            resId = ++g_resourceid;
+            g_fileoffset += g_file.write(resId);
+
+            if (g_mappedMemoryCount + 1 < MAX_MAPPED_MEMORY_COUNT) {
+                g_memoryArray[g_mappedMemoryCount].bufferType = GXMBufferType::SceGxmIndexBuffer;
+                g_memoryArray[g_mappedMemoryCount].resId = resId;
+                g_memoryArray[g_mappedMemoryCount].addr = indexData;
+                g_memoryArray[g_mappedMemoryCount].size = indexbufferSize;
+                g_memoryArray[g_mappedMemoryCount].referenced = 1;
+                ++g_mappedMemoryCount;
+            }
+            else {
+                LOG("Warn: too much mapped memory blocks\n");
+            }
+        }
+   
         //ProgramResource programRes;
         //g_resource_manager.find(GXMType::SceGxmProgram, (uint32_t)vertexRes.programId, &programRes);
 
@@ -1326,42 +1330,54 @@ CREATE_PATCHED_CALL(int, sceGxmDraw, SceGxmContext* context, SceGxmPrimitiveType
 
         //LOGD("sceGxmDraw: program length: %" PRIu32 ", parameter count: %" PRIu32 "\n", programRes.programLength, parameter_count);
 
-        g_fileoffset += g_file.write(vertexRes.streamCount);
+        g_fileoffset += g_file.write(g_activeStreamCount);
 
-        for (uint32_t stream_index = 0; stream_index < vertexRes.streamCount; ++stream_index) {
-            uint32_t vertexBufferSize = (max_index + 1) * vertexRes.streams[stream_index].stride;
+        for (uint32_t stream_index = 0; stream_index < g_activeStreamCount; ++stream_index) {
+            VertexStream const& current_stream = g_activeVertexStreams[g_activeVertexStreams[stream_index].indexSource];
+            uint32_t vertexBufferSize = (max_index + 1) * current_stream.stride;
             g_fileoffset += g_file.write(vertexBufferSize);
             g_fileoffset += g_file.write((uint64_t)vertexBufferSize);
 
             g_fileoffset += ALIGN_TO_64(g_fileoffset);
-            g_fileoffset += g_file.write(g_activeVertexStreams[vertexRes.streams[stream_index].indexSource], vertexBufferSize);
-            resId = ++g_resourceid;
-            g_fileoffset += g_file.write(resId);
+            g_fileoffset += g_file.write(current_stream.dataPtr, vertexBufferSize);
 
-            if (g_mappedMemoryCount + 1 < MAX_MAPPED_MEMORY_COUNT) {
-                g_memoryArray[g_mappedMemoryCount].bufferType = GXMBufferType::SceGxmVertexBuffer;
-                g_memoryArray[g_mappedMemoryCount].resId = resId;
-                g_memoryArray[g_mappedMemoryCount].addr = g_activeVertexStreams[vertexRes.streams[stream_index].indexSource];
-                g_memoryArray[g_mappedMemoryCount].size = vertexBufferSize;
-                g_memoryArray[g_mappedMemoryCount].referenced = 1;
-                ++g_mappedMemoryCount;
-            }
-            else {
-                LOG("Warn: too much mapped memory blocks\n");
-            }
-
-            found = false;
             for (uint32_t memory_index = 0; memory_index < g_mappedMemoryCount; ++memory_index) {
-                if (g_activeVertexStreams[vertexRes.streams[stream_index].indexSource] >= g_memoryArray[memory_index].addr && ((uintptr_t)g_activeVertexStreams[vertexRes.streams[stream_index].indexSource] + vertexBufferSize) < ((uintptr_t)g_memoryArray[memory_index].addr + g_memoryArray[memory_index].size)) {
-                    g_fileoffset += g_file.write(g_memoryArray[memory_index].resId);
+                if (current_stream.dataPtr >= g_memoryArray[memory_index].addr && ((uintptr_t)current_stream.dataPtr + vertexBufferSize) < ((uintptr_t)g_memoryArray[memory_index].addr + g_memoryArray[memory_index].size)) {
                     g_memoryArray[memory_index].referenced = 1;
-                    found = true;
+                    break;
                 }
             }
 
-            if (!found) {
-                LOG("WARN: could not mapped memory for vertex buffer\n");
-                g_fileoffset += g_file.write((uint64_t)0);
+
+            resId = 0;
+            for (uint32_t memory_index = 0; memory_index < g_mappedMemoryCount; ++memory_index) {
+                if (current_stream.dataPtr == g_memoryArray[memory_index].addr && vertexBufferSize == g_memoryArray[memory_index].size)
+                {
+                    resId = g_memoryArray[memory_index].resId;
+                    break;
+                }
+            }
+            
+            if (resId != 0)
+            {
+                g_fileoffset += g_file.write(resId);
+            }
+            else
+            {
+                resId = ++g_resourceid;
+                g_fileoffset += g_file.write(resId);
+
+                if (g_mappedMemoryCount + 1 < MAX_MAPPED_MEMORY_COUNT) {
+                    g_memoryArray[g_mappedMemoryCount].bufferType = GXMBufferType::SceGxmVertexBuffer;
+                    g_memoryArray[g_mappedMemoryCount].resId = resId;
+                    g_memoryArray[g_mappedMemoryCount].addr = current_stream.dataPtr;
+                    g_memoryArray[g_mappedMemoryCount].size = vertexBufferSize;
+                    g_memoryArray[g_mappedMemoryCount].referenced = 1;
+                    ++g_mappedMemoryCount;
+                }
+                else {
+                    LOG("Warn: too much mapped memory blocks\n");
+                }
             }
         }
 
@@ -2175,7 +2191,35 @@ CREATE_PATCHED_CALL(void, sceGxmSetVertexProgram, SceGxmContext *context, const 
         g_fileoffset += g_file.write(context);
         g_fileoffset += g_file.write(vertexProgram);
 
+        VertexProgramResource vertexRes;
+        g_resource_manager.find(GXMType::SceGxmVertexProgram, (uint32_t)vertexProgram, &vertexRes);
+
+        g_fileoffset += g_file.write(vertexRes.attributeCount);
+
+        LOGD("sceGxmSetVertexProgram, active vertex program: attribute count %" PRIu32 "\n", vertexRes.attributeCount);
+        for (uint32_t attribute_index = 0; attribute_index < vertexRes.attributeCount; ++attribute_index) {
+            SceGxmVertexAttribute& attribute = vertexRes.attributes[attribute_index];
+            LOGD("\tattribute: stream index: %" PRIu16 ", offset: %" PRIu16 ", format %s, componentCount: %" PRIu8 ", regIndex: %" PRIu16 "\n", attribute.streamIndex, attribute.offset, attributeFormat2str(attribute.format), attribute.componentCount, attribute.regIndex);
+            g_fileoffset += g_file.write((uint32_t)attribute.format);
+            g_fileoffset += g_file.write(attribute.componentCount);
+            g_fileoffset += g_file.write(attribute.offset);
+            g_fileoffset += g_file.write(attribute.streamIndex);
+            g_fileoffset += g_file.write(attribute.regIndex);
+        }
+
+        LOGD("sceGxmSetVertexProgram, streamCount: %" PRIu32 "\n", vertexRes.streamCount);
+
+        for (uint32_t stream_index = 0; stream_index < vertexRes.streamCount; ++stream_index) {
+            SceGxmVertexStream& stream = vertexRes.streams[stream_index];
+            LOGD("\tstream: stride %" PRIu16 ", indexSource: %" PRIu16 "\n", stream.stride, stream.indexSource);
+
+            g_activeVertexStreams[stream_index].indexSource = stream.indexSource;
+            g_activeVertexStreams[stream_index].stride = stream.stride;
+        }
+
         g_fileoffset += ALIGN_TO_64(g_fileoffset);
+
+        g_activeStreamCount = vertexRes.streamCount;
     }
 
     LOGD("sceGxmSetVertexProgram(context: %p, vertexProgram: %p)\n", context, vertexProgram);
@@ -2200,7 +2244,7 @@ CREATE_PATCHED_CALL(int, sceGxmSetVertexStream, SceGxmContext *context, unsigned
     }
 
     LOGD("sceGxmSetVertexStream(context: %p, streamIndex: %" PRIu32 ", streamData: %p)\n", context, streamIndex, streamData);
-    g_activeVertexStreams[streamIndex] = streamData;
+    g_activeVertexStreams[streamIndex].dataPtr = streamData;
 
     return TAI_NEXT(sceGxmSetVertexStream, sceGxmSetVertexStreamRef, context, streamIndex, streamData);
 }

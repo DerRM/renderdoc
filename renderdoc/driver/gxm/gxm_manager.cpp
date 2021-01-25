@@ -30,3 +30,20 @@ void GXMResourceManager::Apply_InitialState(GXMResource live, const GXMInitialCo
 {
 
 }
+
+GXMResource GXMResourceManager::FindInBuffer(uint32_t size, uint32_t addr)
+{
+  std::map<ResourceId, GXMResource>::const_iterator it;
+  for(it = m_LiveResourceMap.cbegin(); it != m_LiveResourceMap.cend(); it++)
+  {
+    if (it->second.Namespace == GXMNamespace::eResMappedBuffer)
+    {
+      if (it->second.addr <= addr && (it->second.addr + it->second.size) >= (addr + size))
+      {
+        return it->second;
+      }
+    }
+  }
+
+  return GXMResource();
+}

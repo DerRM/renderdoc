@@ -65,6 +65,8 @@ public:
   bool Serialise_InitialState(WriteSerialiser &ser, ResourceId id, GXMResourceRecord *record,
                               const GXMInitialContents *initial);
 
+  GXMResource FindInBuffer(uint32_t size, uint32_t addr);
+
 private:
   bool ResourceTypeRelease(GXMResource res);
   bool Prepare_InitialState(GXMResource res);

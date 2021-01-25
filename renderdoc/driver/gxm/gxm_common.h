@@ -104,6 +104,8 @@ struct GPUBuffer
   uint32_t createFlags = 0;
 };
 
+#define IsReplayingAndReading() (ser.IsReading() && IsReplayMode(m_State))
+
 #define VULKAN_MESH_VIEW_SAMPLES VK_SAMPLE_COUNT_4_BIT
 
 DECLARE_REFLECTION_ENUM(SceGxmIndexFormat);
@@ -114,4 +116,5 @@ DECLARE_REFLECTION_ENUM(SceGxmStencilOp);
 DECLARE_REFLECTION_ENUM(SceGxmDepthWriteMode);
 DECLARE_REFLECTION_ENUM(SceDisplayPixelFormat);
 DECLARE_REFLECTION_ENUM(SceGxmMemoryAttribFlags);
+DECLARE_REFLECTION_ENUM(SceGxmAttributeFormat);
 DECLARE_REFLECTION_ENUM(GXMBufferType);
