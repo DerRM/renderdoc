@@ -31,6 +31,7 @@
 #include "gxm_manager.h"
 #include "gxm_resources.h"
 #include "gxm_state.h"
+#include "gxm_debug.h"
 
 class GXMReplay;
 
@@ -62,6 +63,7 @@ private:
   DrawcallDescription m_ParentDrawcall;
   GXMResourceManager *m_ResourceManager;
   StreamReader *m_FrameReader = NULL;
+  GXMDebugManager *m_DebugManager = NULL;
 public:
   struct VulkanState
   {
@@ -146,6 +148,8 @@ public:
       VkDebugUtilsMessageTypeFlagsEXT messageTypes,
       const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData);
 
+  GXMDebugManager *GetDebugManager() { return m_DebugManager; }
+
 private:
   void AddEvent();
   void AddDrawcall(const DrawcallDescription &d);
@@ -184,6 +188,7 @@ private:
   };
 
   PhysicalDeviceData m_PhysicalDeviceData;
+  uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 public:
   IMPLEMENT_FUNCTION_SERIALISED(int, sceGxmInitialize, const SceGxmInitializeParams *params);

@@ -44,26 +44,47 @@ bool WrappedGXM::Serialise_sceGxmSetVertexProgram(SerialiserType &ser, SceGxmCon
   SERIALISE_ELEMENT_TYPED(uint32_t, context);
   SERIALISE_ELEMENT_TYPED(uint32_t, vertexProgram);
 
+  if(m_Resources.m_VertexProgram.find(vertexProgram) == m_Resources.m_VertexProgram.end())
+  {
+    m_Resources.m_VertexProgram[vertexProgram] = GXMVertexProgram();
+  }
+
+  GXMVertexProgram &prog = m_Resources.m_VertexProgram[vertexProgram];
+
   uint32_t attributeCount;
   SERIALISE_ELEMENT(attributeCount);
+
+  prog.vertexAttrs.resize(attributeCount);
 
   for (uint32_t attrib_index = 0; attrib_index < attributeCount; ++attrib_index)
   {
     SceGxmAttributeFormat format;
     SERIALISE_ELEMENT(format);
 
+    prog.vertexAttrs[attrib_index].format = format;
+
     uint8_t componentCount;
     SERIALISE_ELEMENT(componentCount);
+
+    prog.vertexAttrs[attrib_index].componentCount = componentCount;
 
     uint16_t offset;
     SERIALISE_ELEMENT(offset);
 
+    prog.vertexAttrs[attrib_index].offset = offset;
+
     uint16_t streamIndex;
     SERIALISE_ELEMENT(streamIndex);
 
+    prog.vertexAttrs[attrib_index].streamIndex = streamIndex;
+
     uint16_t regIndex;
     SERIALISE_ELEMENT(regIndex);
+
+    prog.vertexAttrs[attrib_index].regIndex = regIndex;
   }
+
+  m_RenderState.vprogram = vertexProgram;
 
   RDCLOG("sceGxmSetVertexProgram(context: 0x%x, vertexProgram: 0x%x)", context, vertexProgram);
 

@@ -1,5 +1,24 @@
+#include "gxm_debug.h"
 #include "gxm_replay.h"
 #include "gxm_vk_shader_cache.h"
+
+GXMDebugManager::GXMDebugManager(WrappedGXM *driver) 
+{
+
+}
+
+GXMDebugManager::~GXMDebugManager()
+{
+
+}
+
+MeshDisplayPipelines GXMDebugManager::CacheMeshDisplayPipelines(VkPipelineLayout pipeLayout,
+                                                                const MeshFormat &primary, const MeshFormat &secondary)
+{
+  MeshDisplayPipelines cache;
+  return cache;
+}
+
 /*
 void GXMReplay::OverlayRendering::Init(WrappedGXM *driver, VkDescriptorPool descriptorPool)
 {

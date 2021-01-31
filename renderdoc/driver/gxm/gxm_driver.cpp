@@ -235,6 +235,22 @@ bool WrappedGXM::Serialise_ContextConfiguration(SerialiserType &ser, void *ctx)
   return true;
 }
 
+uint32_t WrappedGXM::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+{
+  VkPhysicalDeviceMemoryProperties memProperties;
+  vkGetPhysicalDeviceMemoryProperties(m_vulkanState.m_Gpu, &memProperties);
+  for(uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
+  {
+    if((typeFilter & (1 << i)) &&
+       (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+    {
+      return i;
+    }
+  }
+
+  return 0;
+}
+
 template <typename SerialiserType>
 bool WrappedGXM::Serialise_InitBufferResource(SerialiserType &ser)
 {
@@ -257,13 +273,33 @@ bool WrappedGXM::Serialise_InitBufferResource(SerialiserType &ser)
       bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
       bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
       bufferInfo.size = size;
-      bufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+      bufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 
-      VkBuffer vkbuffer;
-      vkCreateBuffer(m_vulkanState.m_Device, &bufferInfo, NULL, &vkbuffer);
+      VkBuffer dummyBuffer;
+      VkResult result = vkCreateBuffer(m_vulkanState.m_Device, &bufferInfo, NULL, &dummyBuffer);
+      if(result != VK_SUCCESS)
+      {
+        RDCERR("vkCreateBuffer failed");
+      }
 
-      GXMResource res = MappedBufferRes(addr, size, vkbuffer);
+      VkMemoryRequirements memReqs;
+      vkGetBufferMemoryRequirements(m_vulkanState.m_Device, dummyBuffer, &memReqs);
+
+      VkMemoryAllocateInfo allocateInfo = {};
+      allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+      allocateInfo.allocationSize = memReqs.size;
+      allocateInfo.memoryTypeIndex =
+          findMemoryType(memReqs.memoryTypeBits,
+                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+      VkDeviceMemory bufferMemory;
+      result = vkAllocateMemory(m_vulkanState.m_Device, &allocateInfo, NULL, &bufferMemory);
+      if(result != VK_SUCCESS)
+      {
+        RDCERR("vkAllocateMemory failed");
+      }
+
+      GXMResource res = MappedBufferRes(addr, size, bufferMemory);
       ResourceId live = m_ResourceManager->RegisterResource(res);
       GetResourceManager()->AddLiveResource(buffer, res);
 
@@ -271,6 +307,8 @@ bool WrappedGXM::Serialise_InitBufferResource(SerialiserType &ser)
       (void)livegxm;
 
       AddResource(buffer, ResourceType::Buffer, "Mapped Buffer");
+
+      vkDestroyBuffer(m_vulkanState.m_Device, dummyBuffer, NULL);
     }
     else
     {
@@ -281,12 +319,43 @@ bool WrappedGXM::Serialise_InitBufferResource(SerialiserType &ser)
       GetReplay()->GetResourceDesc(origId).derivedResources.push_back(buffer);
       GetReplay()->GetResourceDesc(buffer).parentResources.push_back(origId);
 
+      VkBufferCreateInfo bufferInfo = {};
+      bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+      bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+      bufferInfo.size = size;
       if(type == GXMBufferType::SceGxmIndexBuffer)
-        AddResource(buffer, ResourceType::Buffer, "Index Buffer");
+        bufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
       else if(type == GXMBufferType::SceGxmVertexBuffer)
-        AddResource(buffer, ResourceType::Buffer, "Vertex Buffer");
-    }
+        bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 
+      VkBuffer vkbuffer;
+      VkResult result = vkCreateBuffer(m_vulkanState.m_Device, &bufferInfo, NULL, &vkbuffer);
+      if(result != VK_SUCCESS)
+      {
+        RDCERR("vkCreateBuffer failed");
+      }
+
+      result = vkBindBufferMemory(m_vulkanState.m_Device, vkbuffer, res.memory, addr - res.addr);
+      if(result != VK_SUCCESS)
+      {
+        RDCERR("vkBindBufferMemory failed");
+      }
+
+      if(type == GXMBufferType::SceGxmIndexBuffer)
+      {
+        GXMResource vertex_res = IndexBufferRes(addr, size, vkbuffer);
+        ResourceId live = m_ResourceManager->RegisterResource(vertex_res);
+        GetResourceManager()->AddLiveResource(buffer, vertex_res);
+        AddResource(buffer, ResourceType::Buffer, "Index Buffer");
+      }
+      else if(type == GXMBufferType::SceGxmVertexBuffer)
+      {
+        GXMResource index_res = VertexBufferRes(addr, size, vkbuffer);
+        ResourceId live = m_ResourceManager->RegisterResource(index_res);
+        GetResourceManager()->AddLiveResource(buffer, index_res);
+        AddResource(buffer, ResourceType::Buffer, "Vertex Buffer");
+      }
+    }
   }
 
   return true;
@@ -629,6 +698,8 @@ WrappedGXM::WrappedGXM()
   m_ResourceManager = new GXMResourceManager(state);
 
   m_vulkanState.m_Instance = VK_NULL_HANDLE;
+
+  m_DebugManager = new GXMDebugManager(this);
 }
 
 WrappedGXM::~WrappedGXM()

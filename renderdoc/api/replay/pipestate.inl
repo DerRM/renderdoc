@@ -502,7 +502,7 @@ BoundVBuffer PipeState::GetIBuffer() const
     }
     else if (IsCaptureGXM())
     {
-      buf = ResourceId();
+      buf = m_GXM->vertexInput.indexBuffer;
       ByteOffset = 0;
     }
   }
@@ -908,7 +908,33 @@ rdcarray<VertexInputAttribute> PipeState::GetVertexInputs() const
     }
     else if (IsCaptureGXM())
     {
+      const rdcarray<GXMPipe::VertexAttribute> &attrs = m_GXM->vertexInput.attributes;
+
+      int num = 0;
+      for(int i = 0; i < attrs.count(); i++)
+      {
+        int attrib = i;
+
+        if(attrib >= 0)
+          num++;
+      }
+
+      int a = 0;
       rdcarray<VertexInputAttribute> ret;
+      ret.resize(attrs.count());
+      for(int i = 0; i < attrs.count() && a < num; i++)
+      {
+        ret[a].name = "attr" + ToStr((uint32_t)i);
+        memset(&ret[a].genericValue, 0, sizeof(PixelValue));
+        ret[a].vertexBuffer = (int)attrs[i].vertexBufferSlot;
+        ret[a].byteOffset = attrs[i].byteOffset;
+        ret[a].format = attrs[i].format;
+        ret[a].used = true;
+        ret[a].genericEnabled = false;
+
+        a++;
+      }
+
       return ret;
     }
   }

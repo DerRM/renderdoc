@@ -74,8 +74,7 @@ struct GPUBuffer
     eGPUBufferAddressable = 0x40,
   };
 
-  void Create(WrappedGXM *driver, VkDevice dev, VkDeviceSize size, uint32_t ringSize,
-              uint32_t flags);
+  void Create(WrappedGXM *driver, VkDevice dev, VkDeviceSize size, uint32_t ringSize, uint32_t flags);
   void Destroy();
 
   void FillDescriptor(VkDescriptorBufferInfo &desc);
@@ -103,6 +102,8 @@ struct GPUBuffer
   VkDevice device = VK_NULL_HANDLE;
   uint32_t createFlags = 0;
 };
+
+ResourceFormat MakeAttributeFormat(SceGxmAttributeFormat fmt, uint8_t componentCount);
 
 #define IsReplayingAndReading() (ser.IsReading() && IsReplayMode(m_State))
 

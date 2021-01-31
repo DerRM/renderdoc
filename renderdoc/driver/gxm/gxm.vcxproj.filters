@@ -68,6 +68,9 @@
     <ClInclude Include="gxm_state.h">
       <Filter>Util</Filter>
     </ClInclude>
+    <ClInclude Include="gxm_debug.h">
+      <Filter>Replay</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gxm_driver.cpp">
@@ -122,6 +125,9 @@
       <Filter>Util</Filter>
     </ClCompile>
     <ClCompile Include="gxm_vk_info.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="gxm_resources.cpp">
       <Filter>Util</Filter>
     </ClCompile>
   </ItemGroup>

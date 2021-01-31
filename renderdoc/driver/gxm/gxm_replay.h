@@ -30,6 +30,7 @@
 #include "replay/replay_driver.h"
 #include "gxm_common.h"
 #include "gxm_driver.h"
+#include "gxm_debug.h"
 
 #if ENABLED(RDOC_WIN32)
 
@@ -235,10 +236,24 @@ public:
     VkImageMemoryBarrier depthBarrier;
   };
 
+  struct MeshRendering
+  {
+    void Init(WrappedGXM *driver, VkDescriptorPool descriptorPool);
+    void Destroy(WrappedGXM *driver);
+
+    GPUBuffer UBO;
+    GPUBuffer BBoxVB;
+    GPUBuffer AxisFrustumVB;
+
+    VkDescriptorSetLayout DescSetLayout = VK_NULL_HANDLE;
+    VkPipelineLayout PipeLayout = VK_NULL_HANDLE;
+    VkDescriptorSet DescSet = VK_NULL_HANDLE;
+  } m_MeshRender;
+
   struct OverlayRendering
   {
-    //void Init(WrappedGXM *driver, VkDescriptorPool descriptorPool);
-    //void Destroy(WrappedGXM *driver);
+    // void Init(WrappedGXM *driver, VkDescriptorPool descriptorPool);
+    // void Destroy(WrappedGXM *driver);
 
     VkDeviceMemory ImageMem = VK_NULL_HANDLE;
     VkDeviceSize ImageMemSize = 0;
@@ -281,4 +296,6 @@ private:
   uint32_t m_DebugWidth, m_DebugHeight;
 
   GXMPipe::State m_PipelineState;
+
+  GXMDebugManager *GetDebugManager();
 };

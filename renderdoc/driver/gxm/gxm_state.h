@@ -7,22 +7,23 @@ struct GXMVertexProgram
 {
   struct Attribute
   {
-    uint32_t location;
-    uint32_t binding;
     SceGxmAttributeFormat format;
-    uint32_t byteoffset;
+    uint8_t componentCount;
+    uint16_t offset;
+    uint16_t streamIndex;
+    uint16_t regIndex;
   };
   rdcarray<Attribute> vertexAttrs;
 };
 
 struct GXMResources
 {
-  std::map<ResourceId, GXMVertexProgram> m_VertexProgram;
+  std::map<SceGxmVertexProgram const*, GXMVertexProgram> m_VertexProgram;
 };
 
 struct GXMRenderState
 {
-  ResourceId vprogram;
+  SceGxmVertexProgram const* vprogram;
 
   struct IdxBuffer
   {
@@ -32,6 +33,8 @@ struct GXMRenderState
   struct VertBuffer
   {
     ResourceId buf;
+    uint32_t stride;
+    uint32_t offset;
   };
   rdcarray<VertBuffer> vbuffers;
 };

@@ -1662,18 +1662,18 @@ static void RT_FetchMeshData(IReplayController *r, ICaptureContext &ctx, Populat
     bool pi = false;
     bool pv = false;
 
-    uint32_t maxAttrOffset = 0;
+    //uint32_t maxAttrOffset = 0;
 
     for(int c = 0; c < data->vsinConfig.columns.count(); c++)
     {
-      const ShaderConstant &col = data->vsinConfig.columns[c];
+      //const ShaderConstant &col = data->vsinConfig.columns[c];
       const BufferElementProperties &prop = data->vsinConfig.props[c];
 
       if(prop.buffer == vbIdx)
       {
         used = true;
 
-        maxAttrOffset = qMax(maxAttrOffset, col.byteOffset);
+        //maxAttrOffset = qMax(maxAttrOffset, col.byteOffset);
 
         if(prop.perinstance)
           pi = true;
@@ -1711,7 +1711,7 @@ static void RT_FetchMeshData(IReplayController *r, ICaptureContext &ctx, Populat
     if(used)
     {
       buf->storage = r->GetBufferData(vb.resourceId, vb.byteOffset + offset * vb.byteStride,
-                                      qMax(maxIdx, maxIdx + 1) * vb.byteStride + maxAttrOffset);
+                                      qMax(maxIdx, maxIdx + 1) * vb.byteStride/* + maxAttrOffset*/);
 
       buf->stride = vb.byteStride;
     }

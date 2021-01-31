@@ -90,6 +90,7 @@ struct GXMResource
   VkImage image;
   VkShaderModule shader;
   VkPipeline pipeline;
+  VkDeviceMemory memory;
 };
 
 inline GXMResource TextureRes()
@@ -100,12 +101,12 @@ inline GXMResource FramebufferRes()
 {
   return GXMResource(eResFramebuffer);
 }
-inline GXMResource MappedBufferRes(uint32_t buffer_addr, uint32_t buffer_size, VkBuffer buffer)
+inline GXMResource MappedBufferRes(uint32_t buffer_addr, uint32_t buffer_size, VkDeviceMemory memory)
 {
   GXMResource res(eResMappedBuffer);
   res.addr = buffer_addr;
   res.size = buffer_size;
-  res.buffer = buffer;
+  res.memory = memory;
   
   return res;
 }

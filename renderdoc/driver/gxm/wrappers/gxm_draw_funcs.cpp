@@ -42,12 +42,50 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
 
   SERIALISE_ELEMENT_ARRAY(indexData, indexbufferSize);
 
+  uint32_t max_index = 0;
+
+  switch(indexType)
+  {
+    case SCE_GXM_INDEX_FORMAT_U16:
+    {
+      uint16_t *indices = (uint16_t *)indexData;
+      for(uint32_t index = 0; index < indexCount; ++index)
+      {
+        if(max_index < indices[index])
+        {
+          max_index = indices[index];
+        }
+      }
+    }
+    break;
+    case SCE_GXM_INDEX_FORMAT_U32:
+    {
+      uint32_t *indices = (uint32_t *)indexData;
+      for(uint32_t index = 0; index < indexCount; ++index)
+      {
+        if(max_index < indices[index])
+        {
+          max_index = indices[index];
+        }
+      }
+    }
+    break;
+    default: break;
+  }
+
   ResourceId indexbuffer;
   SERIALISE_ELEMENT(indexbuffer);
 
+  GXMResource index_res = GetResourceManager()->GetLiveResource(indexbuffer); 
   ResourceId parentId = GetReplay()->GetResourceDesc(indexbuffer).parentResources[0];
-  GXMResource res = GetResourceManager()->GetLiveResource(parentId);
-  (void)res;
+  GXMResource memory_res = GetResourceManager()->GetLiveResource(parentId);
+
+  void *index_data;
+  vkMapMemory(m_vulkanState.m_Device, memory_res.memory, index_res.addr - memory_res.addr, index_res.size, 0, &index_data);
+  memcpy(index_data, indexData, indexbufferSize);
+  vkUnmapMemory(m_vulkanState.m_Device, memory_res.memory);
+
+  m_RenderState.ibuffer.buf = GetResourceManager()->GetLiveID(indexbuffer);
 
   uint32_t streamCount;
   SERIALISE_ELEMENT(streamCount);
@@ -58,15 +96,24 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
   {
     uint32_t vertexBufferSize;
     SERIALISE_ELEMENT(vertexBufferSize);
-    const void *data;
-    SERIALISE_ELEMENT_ARRAY(data, vertexBufferSize);
+    const void *vertexData;
+    SERIALISE_ELEMENT_ARRAY(vertexData, vertexBufferSize);
 
     ResourceId vertexBuffer;
     SERIALISE_ELEMENT(vertexBuffer);
 
+    GXMResource vertex_res = GetResourceManager()->GetLiveResource(vertexBuffer);
     ResourceId vertexParentId = GetReplay()->GetResourceDesc(vertexBuffer).parentResources[0];
-    GXMResource vertexRes = GetResourceManager()->GetLiveResource(vertexParentId);
-    (void)vertexRes;
+    GXMResource vertex_memory_res = GetResourceManager()->GetLiveResource(vertexParentId);
+    
+    void *vertex_data;
+    vkMapMemory(m_vulkanState.m_Device, vertex_memory_res.memory, vertex_res.addr - vertex_memory_res.addr, vertex_res.size, 0, &vertex_data);
+    memcpy(vertex_data, vertexData, vertexBufferSize);
+    vkUnmapMemory(m_vulkanState.m_Device, vertex_memory_res.memory);
+
+    state.vbuffers[stream_index].buf = GetResourceManager()->GetLiveID(vertexBuffer);
+    state.vbuffers[stream_index].stride = vertexBufferSize / (max_index + 1);
+    state.vbuffers[stream_index].offset = 0;
   }
 
   SERIALISE_CHECK_READ_ERRORS();
@@ -90,7 +137,7 @@ bool WrappedGXM::Serialise_sceGxmDraw(SerialiserType &ser, SceGxmContext *contex
       draw.vertexOffset = 0;
       draw.instanceOffset = 0;
 
-      draw.flags |= DrawFlags::Drawcall;
+      draw.flags |= DrawFlags::Drawcall | DrawFlags::Indexed;
 
       draw.topology = MakePrimitiveTopology(primType);
       draw.indexByteWidth = IdxSize;
