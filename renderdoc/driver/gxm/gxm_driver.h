@@ -34,6 +34,7 @@
 #include "gxm_debug.h"
 
 class GXMReplay;
+class GXMVkShaderCache;
 
 struct GXMInitParams
 {
@@ -73,6 +74,8 @@ public:
     uint32_t m_QueueFamilyIndex;
     VkQueue m_Queue;
     VkDebugUtilsMessengerEXT m_DbgUtilsCallback;
+    VkPhysicalDeviceFeatures m_DeviceFeatures;
+    VkPhysicalDeviceProperties m_DeviceProperties;
   };
 
   WrappedGXM();
@@ -104,6 +107,8 @@ public:
   void WrappedGXM::SubmitCmds();
   void WrappedGXM::FlushQ();
   GXMVkCreationInfo m_CreationInfo;
+
+  GXMVkShaderCache *GetShaderCache() { return m_ShaderCache; }
 
   GXMRenderState m_RenderState;
   GXMRenderState &GetRenderState() { return m_RenderState; }
@@ -174,6 +179,8 @@ private:
 
   rdcarray<WindowingSystem> m_SupportedWindowSystems;
   VulkanState m_vulkanState;
+
+  GXMVkShaderCache* m_ShaderCache;
 
   struct PhysicalDeviceData
   {

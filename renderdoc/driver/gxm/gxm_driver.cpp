@@ -29,6 +29,7 @@
 #include "serialise/rdcfile.h"
 
 #include "gxm_replay.h"
+#include "gxm_vk_shader_cache.h"
 
 void WrappedGXM::StartFrameCapture(void *dev, void *wnd) {}
 
@@ -698,8 +699,6 @@ WrappedGXM::WrappedGXM()
   m_ResourceManager = new GXMResourceManager(state);
 
   m_vulkanState.m_Instance = VK_NULL_HANDLE;
-
-  m_DebugManager = new GXMDebugManager(this);
 }
 
 WrappedGXM::~WrappedGXM()
@@ -904,6 +903,9 @@ ReplayStatus WrappedGXM::Initialise()
 
   m_vulkanState.m_Gpu = gpus[0];
 
+  vkGetPhysicalDeviceFeatures(m_vulkanState.m_Gpu, &m_vulkanState.m_DeviceFeatures);
+  vkGetPhysicalDeviceProperties(m_vulkanState.m_Gpu, &m_vulkanState.m_DeviceProperties);
+
   vkGetPhysicalDeviceQueueFamilyProperties(m_vulkanState.m_Gpu, &count, NULL);
 
   rdcarray<VkQueueFamilyProperties> queues(count);
@@ -948,6 +950,15 @@ ReplayStatus WrappedGXM::Initialise()
     strDeviceExtensions[strExtIndex] = enabledDeviceExtensions[strExtIndex].c_str();
   }
 
+  VkPhysicalDeviceFeatures enabledFeatures = {};
+
+  if(m_vulkanState.m_DeviceFeatures.depthClamp)
+    enabledFeatures.depthClamp = true;
+  if(m_vulkanState.m_DeviceFeatures.fillModeNonSolid)
+    enabledFeatures.fillModeNonSolid = true;
+  if(m_vulkanState.m_DeviceFeatures.geometryShader)
+    enabledFeatures.geometryShader = true;
+
   VkDeviceCreateInfo deviceinfo = {VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
                                    NULL,
                                    0,
@@ -957,7 +968,9 @@ ReplayStatus WrappedGXM::Initialise()
                                    NULL,
                                    (uint32_t)enabledDeviceExtensions.size(),
                                    &strDeviceExtensions[0],
-                                   NULL};
+                                   &enabledFeatures};
+
+  m_vulkanState.m_DeviceFeatures = enabledFeatures;
 
   vkCreateDevice(m_vulkanState.m_Gpu, &deviceinfo, NULL, &m_vulkanState.m_Device);
 
@@ -979,6 +992,20 @@ ReplayStatus WrappedGXM::Initialise()
         vkCreateCommandPool(m_vulkanState.m_Device, &poolInfo, NULL, &m_InternalCmds.cmdpool);
     RDCASSERTEQUAL(vkr, VK_SUCCESS);
   }
+
+  m_PhysicalDeviceData.readbackMemIndex =
+      m_PhysicalDeviceData.GetMemoryIndex(~0U, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, 0);
+  m_PhysicalDeviceData.uploadMemIndex =
+      m_PhysicalDeviceData.GetMemoryIndex(~0U, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, 0);
+  m_PhysicalDeviceData.GPULocalMemIndex = m_PhysicalDeviceData.GetMemoryIndex(
+      ~0U, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+  m_DebugManager = new GXMDebugManager(this);
+  m_ShaderCache = new GXMVkShaderCache(this);
+
+  GetReplay()->m_General.Init(this, VK_NULL_HANDLE);
+  GetReplay()->m_MeshRender.Init(this, GetReplay()->m_General.DescriptorPool);
+  GetReplay()->m_Overlay.Init(this, GetReplay()->m_General.DescriptorPool);
 
   return ReplayStatus::Succeeded;
 }

@@ -321,10 +321,6 @@ void GXMReplay::RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &seconda
   if(cfg.position.vertexResourceId == ResourceId() || cfg.position.numIndices == 0)
     return;
 
-  // TODO: REMOVE!!!!!
-  if(cfg.position.vertexResourceId != ResourceId())
-    return;
-
   auto it = m_OutputWindows.find(m_ActiveWinID);
   if(m_ActiveWinID == 0 || it == m_OutputWindows.end())
     return;
@@ -450,7 +446,7 @@ void GXMReplay::RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &seconda
                                 &m_MeshRender.DescSet, 1, &uboOffs);
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          secondaryCache.pipes[MeshDisplayPipelines::ePipe_WireDepth]);
+                          secondaryCache.pipes[MeshDisplayPipelines::ePipe_Wire]);
 
         VkBuffer vb = m_pDriver->GetResourceManager()->GetLiveResource(fmt.vertexResourceId).buffer;
 
@@ -507,7 +503,7 @@ void GXMReplay::RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &seconda
   if(cfg.position.vertexResourceId != ResourceId())
   {
     VkBuffer vb =
-        m_pDriver->GetResourceManager()->GetLiveResource(cfg.position.vertexResourceId).buffer;
+        m_pDriver->GetResourceManager()->GetCurrentResource(cfg.position.vertexResourceId).buffer;
 
     VkDeviceSize offs = cfg.position.vertexByteOffset;
 
@@ -547,19 +543,19 @@ void GXMReplay::RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &seconda
     switch(solidShadeMode)
     {
       default:
-      case SolidShade::Solid: pipe = cache.pipes[MeshDisplayPipelines::ePipe_SolidDepth]; break;
+      case SolidShade::Solid: pipe = cache.pipes[MeshDisplayPipelines::ePipe_Solid]; break;
       case SolidShade::Lit:
         pipe = cache.pipes[MeshDisplayPipelines::ePipe_Lit];
         // point list topologies don't have lighting obvious, just render them as solid
         if(pipe == VK_NULL_HANDLE)
-          pipe = cache.pipes[MeshDisplayPipelines::ePipe_SolidDepth];
+          pipe = cache.pipes[MeshDisplayPipelines::ePipe_Solid];
         break;
       case SolidShade::Secondary: pipe = cache.pipes[MeshDisplayPipelines::ePipe_Secondary]; break;
     }
 
     // can't support lit rendering without the pipeline - maybe geometry shader wasn't supported.
     if(solidShadeMode == SolidShade::Lit && pipe == VK_NULL_HANDLE)
-      pipe = cache.pipes[MeshDisplayPipelines::ePipe_SolidDepth];
+      pipe = cache.pipes[MeshDisplayPipelines::ePipe_Solid];
 
     uint32_t uboOffs = 0;
     MeshUBOData *data = (MeshUBOData *)m_MeshRender.UBO.Map(&uboOffs);
@@ -595,7 +591,7 @@ void GXMReplay::RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &seconda
       if(cfg.position.indexResourceId != ResourceId())
       {
         VkBuffer ib =
-            m_pDriver->GetResourceManager()->GetLiveResource(cfg.position.indexResourceId).buffer;
+            m_pDriver->GetResourceManager()->GetCurrentResource(cfg.position.indexResourceId).buffer;
 
         vkCmdBindIndexBuffer(cmd, ib, cfg.position.indexByteOffset, idxtype);
       }
@@ -630,7 +626,7 @@ void GXMReplay::RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &seconda
                             &m_MeshRender.DescSet, 1, &uboOffs);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      cache.pipes[MeshDisplayPipelines::ePipe_WireDepth]);
+                      cache.pipes[MeshDisplayPipelines::ePipe_Wire]);
 
     if(cfg.position.indexByteStride)
     {
@@ -643,7 +639,7 @@ void GXMReplay::RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &seconda
       if(cfg.position.indexResourceId != ResourceId())
       {
         VkBuffer ib =
-            m_pDriver->GetResourceManager()->GetLiveResource(cfg.position.indexResourceId).buffer;
+            m_pDriver->GetResourceManager()->GetCurrentResource(cfg.position.indexResourceId).buffer;
 
         vkCmdBindIndexBuffer(cmd, ib, cfg.position.indexByteOffset, idxtype);
       }
@@ -718,7 +714,7 @@ void GXMReplay::RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &seconda
                             &m_MeshRender.DescSet, 1, &uboOffs);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      cache.pipes[MeshDisplayPipelines::ePipe_WireDepth]);
+                      cache.pipes[MeshDisplayPipelines::ePipe_Wire]);
 
     vkCmdDraw(cmd, 24, 1, 0, 0);
   }
@@ -809,7 +805,7 @@ void GXMReplay::RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &seconda
   }
 
   // show highlighted vertex
-  /*if(cfg.highlightVert != ~0U)
+  if(cfg.highlightVert != ~0U)
   {
     {
       // need to end our cmd buffer, it might be submitted in GetBufferData when caching highlight
@@ -1041,7 +1037,7 @@ void GXMReplay::RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &seconda
         }
       }
     }
-  }*/
+  }
 
   vkCmdEndRenderPass(cmd);
 
@@ -1101,7 +1097,7 @@ void GXMReplay::RenderCheckerboard()
   VkResult vkr = vkBeginCommandBuffer(cmd, &beginInfo);
   RDCASSERTEQUAL(vkr, VK_SUCCESS);
 
-  // uint32_t uboOffs = 0;
+  uint32_t uboOffs = 0;
 
   VkRenderPassBeginInfo rpbegin = {
       VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -1118,7 +1114,7 @@ void GXMReplay::RenderCheckerboard()
   };
   vkCmdBeginRenderPass(cmd, &rpbegin, VK_SUBPASS_CONTENTS_INLINE);
 
-  /*if(m_Overlay.m_CheckerPipeline != VK_NULL_HANDLE)
+  if(m_Overlay.m_CheckerPipeline != VK_NULL_HANDLE)
   {
     CheckerboardUBOData *data = (CheckerboardUBOData *)m_Overlay.m_CheckerUBO.Map(&uboOffs);
     data->BorderWidth = 0.0f;
@@ -1132,26 +1128,26 @@ void GXMReplay::RenderCheckerboard()
     m_Overlay.m_CheckerUBO.Unmap();
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                        outw.dsimg == VK_NULL_HANDLE ? Unwrap(m_Overlay.m_CheckerPipeline)
-                                                     : Unwrap(m_Overlay.m_CheckerMSAAPipeline));
+                        outw.dsimg == VK_NULL_HANDLE ? m_Overlay.m_CheckerPipeline
+                                                     : m_Overlay.m_CheckerMSAAPipeline);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              Unwrap(m_Overlay.m_CheckerPipeLayout), 0, 1,
-                              UnwrapPtr(m_Overlay.m_CheckerDescSet), 1, &uboOffs);
+                              m_Overlay.m_CheckerPipeLayout, 0, 1,
+                              &m_Overlay.m_CheckerDescSet, 1, &uboOffs);
 
     VkViewport viewport = {0.0f, 0.0f, (float)m_DebugWidth, (float)m_DebugHeight, 0.0f, 1.0f};
     vkCmdSetViewport(cmd, 0, 1, &viewport);
 
     vkCmdDraw(cmd, 4, 1, 0, 0);
 
-    if(m_pDriver->GetDriverInfo().QualcommLeakingUBOOffsets())
+    /*if(m_pDriver->GetDriverInfo().QualcommLeakingUBOOffsets())
     {
       uboOffs = 0;
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                Unwrap(m_Overlay.m_CheckerPipeLayout), 0, 1,
-                                UnwrapPtr(m_Overlay.m_CheckerDescSet), 1, &uboOffs);
-    }
+                                m_Overlay.m_CheckerPipeLayout, 0, 1,
+                                m_Overlay.m_CheckerDescSet, 1, &uboOffs);
+    }*/
   }
-  else*/
+  else
   {
     // some mobile chips fail to create the checkerboard pipeline. Use an alternate approach with
     // CmdClearAttachment and many rects.
@@ -1371,6 +1367,8 @@ GXMReplay::GXMReplay(WrappedGXM *d)
   m_pDriver = d;
   m_OutputWinID = 1;
   m_ActiveWinID = 0;
+
+  m_HighlightCache.driver = this;
 }
 
 void GXMReplay::Shutdown() {}

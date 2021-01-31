@@ -25,4 +25,11 @@ public:
   MeshDisplayPipelines CacheMeshDisplayPipelines(VkPipelineLayout pipeLayout,
                                                  const MeshFormat &primary,
                                                  const MeshFormat &secondary);
+
+private:
+  // CacheMeshDisplayPipelines
+  std::map<uint64_t, MeshDisplayPipelines> m_CachedMeshPipelines;
+
+  WrappedGXM *m_pDriver = NULL;
+  VkDevice m_Device = VK_NULL_HANDLE;
 };

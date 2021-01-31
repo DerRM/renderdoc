@@ -236,14 +236,24 @@ public:
     VkImageMemoryBarrier depthBarrier;
   };
 
+    // General use/misc items that are used in many places
+  struct GeneralMisc
+  {
+    void Init(WrappedGXM *driver, VkDescriptorPool descriptorPool);
+    void Destroy(WrappedGXM *driver);
+
+    VkDescriptorPool DescriptorPool = VK_NULL_HANDLE;
+    VkSampler PointSampler = VK_NULL_HANDLE;
+  } m_General;
+
   struct MeshRendering
   {
     void Init(WrappedGXM *driver, VkDescriptorPool descriptorPool);
     void Destroy(WrappedGXM *driver);
 
-    GPUBuffer UBO;
-    GPUBuffer BBoxVB;
-    GPUBuffer AxisFrustumVB;
+    GXMGPUBuffer UBO;
+    GXMGPUBuffer BBoxVB;
+    GXMGPUBuffer AxisFrustumVB;
 
     VkDescriptorSetLayout DescSetLayout = VK_NULL_HANDLE;
     VkPipelineLayout PipeLayout = VK_NULL_HANDLE;
@@ -252,7 +262,7 @@ public:
 
   struct OverlayRendering
   {
-    // void Init(WrappedGXM *driver, VkDescriptorPool descriptorPool);
+    void Init(WrappedGXM *driver, VkDescriptorPool descriptorPool);
     // void Destroy(WrappedGXM *driver);
 
     VkDeviceMemory ImageMem = VK_NULL_HANDLE;
@@ -269,14 +279,14 @@ public:
     VkPipeline m_CheckerPipeline = VK_NULL_HANDLE;
     VkPipeline m_CheckerMSAAPipeline = VK_NULL_HANDLE;
     VkPipeline m_CheckerF16Pipeline[8] = {VK_NULL_HANDLE};
-    GPUBuffer m_CheckerUBO;
+    GXMGPUBuffer m_CheckerUBO;
 
     VkDescriptorSetLayout m_QuadDescSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet m_QuadDescSet = VK_NULL_HANDLE;
     VkPipelineLayout m_QuadResolvePipeLayout = VK_NULL_HANDLE;
     VkPipeline m_QuadResolvePipeline[8] = {VK_NULL_HANDLE};
 
-    GPUBuffer m_TriSizeUBO;
+    GXMGPUBuffer m_TriSizeUBO;
     VkDescriptorSetLayout m_TriSizeDescSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet m_TriSizeDescSet = VK_NULL_HANDLE;
     VkPipelineLayout m_TriSizePipeLayout = VK_NULL_HANDLE;
@@ -298,4 +308,5 @@ private:
   GXMPipe::State m_PipelineState;
 
   GXMDebugManager *GetDebugManager();
+  HighlightCache m_HighlightCache;
 };

@@ -9,6 +9,6 @@ Topology MakePrimitiveTopology(SceGxmPrimitiveType Topo)
     case SCE_GXM_PRIMITIVE_LINES: return Topology::LineList;
     case SCE_GXM_PRIMITIVE_TRIANGLE_STRIP: return Topology::TriangleStrip;
     case SCE_GXM_PRIMITIVE_TRIANGLE_FAN: return Topology::TriangleFan;
-    case SCE_GXM_PRIMITIVE_TRIANGLE_EDGES: return Topology::TriangleList;
+    case SCE_GXM_PRIMITIVE_TRIANGLES: return Topology::TriangleList;
   }
 }

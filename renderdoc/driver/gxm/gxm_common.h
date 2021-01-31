@@ -51,6 +51,9 @@
 #define SINGLE_FLUSH_VALIDATE OPTION_OFF
 
 Topology MakePrimitiveTopology(SceGxmPrimitiveType Topo);
+VkPrimitiveTopology MakeGXMVkPrimitiveTopology(Topology Topo);
+VkFormat MakeGXMVkFormat(ResourceFormat fmt);
+bool IsDepthOrStencilFormatGXM(VkFormat f);
 
 extern void *LoadVulkanLibrary();
 
@@ -61,7 +64,7 @@ typedef enum SceDisplayPixelFormat
 
 class WrappedGXM;
 
-struct GPUBuffer
+struct GXMGPUBuffer
 {
   enum CreateFlags
   {
