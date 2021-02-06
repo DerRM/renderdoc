@@ -2220,6 +2220,21 @@ CREATE_PATCHED_CALL(void, sceGxmSetVertexProgram, SceGxmContext *context, const 
         g_fileoffset += ALIGN_TO_64(g_fileoffset);
 
         g_activeStreamCount = vertexRes.streamCount;
+
+        const SceGxmProgram* program = sceGxmShaderPatcherGetProgramFromId(vertexRes.programId);
+        if (program) {
+            uint32_t parameter_count = sceGxmProgramGetParameterCount(program);
+            for (uint32_t parameter_index = 0; parameter_index < parameter_count; ++parameter_index) {
+                const SceGxmProgramParameter* parameter = sceGxmProgramGetParameter(program, parameter_index);
+                SceGxmParameterCategory category = sceGxmProgramParameterGetCategory(parameter);
+                if (category == SceGxmParameterCategory::SCE_GXM_PARAMETER_CATEGORY_ATTRIBUTE) {
+                    SceGxmParameterType parameter_type = sceGxmProgramParameterGetType(parameter);
+                    SceGxmParameterSemantic parameter_semantic = sceGxmProgramParameterGetSemantic(parameter);
+                    uint32_t parameter_comp_count = sceGxmProgramParameterGetComponentCount(parameter);
+                    LOGD("\tvertex attribute [%" PRIu32 "]: parameter_type: %s, parameter_semantic: %s, component_count: %" PRIu32 "\n", parameter_index, parameterType2str(parameter_type), parameterSemantic2str(parameter_semantic), parameter_comp_count);
+                }
+            }
+        }
     }
 
     LOGD("sceGxmSetVertexProgram(context: %p, vertexProgram: %p)\n", context, vertexProgram);

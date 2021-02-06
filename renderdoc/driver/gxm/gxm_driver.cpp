@@ -270,46 +270,7 @@ bool WrappedGXM::Serialise_InitBufferResource(SerialiserType &ser)
   {
     if(type == GXMBufferType::SceGxmMappedBuffer)
     {
-      VkBufferCreateInfo bufferInfo = {};
-      bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-      bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-      bufferInfo.size = size;
-      bufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-
-      VkBuffer dummyBuffer;
-      VkResult result = vkCreateBuffer(m_vulkanState.m_Device, &bufferInfo, NULL, &dummyBuffer);
-      if(result != VK_SUCCESS)
-      {
-        RDCERR("vkCreateBuffer failed");
-      }
-
-      VkMemoryRequirements memReqs;
-      vkGetBufferMemoryRequirements(m_vulkanState.m_Device, dummyBuffer, &memReqs);
-
-      VkMemoryAllocateInfo allocateInfo = {};
-      allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-      allocateInfo.allocationSize = memReqs.size;
-      allocateInfo.memoryTypeIndex =
-          findMemoryType(memReqs.memoryTypeBits,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-      VkDeviceMemory bufferMemory;
-      result = vkAllocateMemory(m_vulkanState.m_Device, &allocateInfo, NULL, &bufferMemory);
-      if(result != VK_SUCCESS)
-      {
-        RDCERR("vkAllocateMemory failed");
-      }
-
-      GXMResource res = MappedBufferRes(addr, size, bufferMemory);
-      ResourceId live = m_ResourceManager->RegisterResource(res);
-      GetResourceManager()->AddLiveResource(buffer, res);
-
-      GXMResource livegxm = GetResourceManager()->GetLiveResource(buffer);
-      (void)livegxm;
-
       AddResource(buffer, ResourceType::Buffer, "Mapped Buffer");
-
-      vkDestroyBuffer(m_vulkanState.m_Device, dummyBuffer, NULL);
     }
     else
     {
@@ -336,26 +297,52 @@ bool WrappedGXM::Serialise_InitBufferResource(SerialiserType &ser)
         RDCERR("vkCreateBuffer failed");
       }
 
-      result = vkBindBufferMemory(m_vulkanState.m_Device, vkbuffer, res.memory, addr - res.addr);
+      VkMemoryRequirements memReqs;
+      vkGetBufferMemoryRequirements(m_vulkanState.m_Device, vkbuffer, &memReqs);
+
+      VkMemoryAllocateInfo allocateInfo = {};
+      allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+      allocateInfo.allocationSize = memReqs.size;
+      allocateInfo.memoryTypeIndex =
+          findMemoryType(memReqs.memoryTypeBits,
+                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+      VkDeviceMemory bufferMemory;
+      result = vkAllocateMemory(m_vulkanState.m_Device, &allocateInfo, NULL, &bufferMemory);
+      if(result != VK_SUCCESS)
+      {
+        RDCERR("vkAllocateMemory failed");
+      }
+
+
+      result = vkBindBufferMemory(m_vulkanState.m_Device, vkbuffer, bufferMemory, 0);
       if(result != VK_SUCCESS)
       {
         RDCERR("vkBindBufferMemory failed");
       }
 
+      BufferDescription desc = {};
+
       if(type == GXMBufferType::SceGxmIndexBuffer)
       {
-        GXMResource vertex_res = IndexBufferRes(addr, size, vkbuffer);
+        GXMResource vertex_res = IndexBufferRes(addr, size, vkbuffer, bufferMemory);
         ResourceId live = m_ResourceManager->RegisterResource(vertex_res);
         GetResourceManager()->AddLiveResource(buffer, vertex_res);
         AddResource(buffer, ResourceType::Buffer, "Index Buffer");
+        desc.creationFlags = BufferCategory::Index;
       }
       else if(type == GXMBufferType::SceGxmVertexBuffer)
       {
-        GXMResource index_res = VertexBufferRes(addr, size, vkbuffer);
+        GXMResource index_res = VertexBufferRes(addr, size, vkbuffer, bufferMemory);
         ResourceId live = m_ResourceManager->RegisterResource(index_res);
         GetResourceManager()->AddLiveResource(buffer, index_res);
         AddResource(buffer, ResourceType::Buffer, "Vertex Buffer");
+        desc.creationFlags = BufferCategory::Vertex;
       }
+
+      desc.resourceId = buffer;
+      desc.length = size;
+      m_buffers.push_back(desc);
     }
   }
 
@@ -779,6 +766,11 @@ VkBool32 VKAPI_PTR WrappedGXM::DebugUtilsCallbackStatic(
 
   return ((WrappedGXM *)pUserData)
       ->DebugCallback(severity, category, messageCode, pMessageId, pCallbackData->pMessage);
+}
+
+rdcarray<BufferDescription> WrappedGXM::GetBuffers()
+{
+  return m_buffers;
 }
 
 ReplayStatus WrappedGXM::Initialise()

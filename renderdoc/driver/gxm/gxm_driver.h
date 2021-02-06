@@ -28,10 +28,10 @@
 #include "common/common.h"
 #include "core/core.h"
 #include "gxm_common.h"
+#include "gxm_debug.h"
 #include "gxm_manager.h"
 #include "gxm_resources.h"
 #include "gxm_state.h"
-#include "gxm_debug.h"
 
 class GXMReplay;
 class GXMVkShaderCache;
@@ -65,6 +65,7 @@ private:
   GXMResourceManager *m_ResourceManager;
   StreamReader *m_FrameReader = NULL;
   GXMDebugManager *m_DebugManager = NULL;
+
 public:
   struct VulkanState
   {
@@ -154,6 +155,7 @@ public:
       const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData);
 
   GXMDebugManager *GetDebugManager() { return m_DebugManager; }
+  rdcarray<BufferDescription> GetBuffers();
 
 private:
   void AddEvent();
@@ -180,7 +182,7 @@ private:
   rdcarray<WindowingSystem> m_SupportedWindowSystems;
   VulkanState m_vulkanState;
 
-  GXMVkShaderCache* m_ShaderCache;
+  GXMVkShaderCache *m_ShaderCache;
 
   struct PhysicalDeviceData
   {
@@ -195,6 +197,7 @@ private:
   };
 
   PhysicalDeviceData m_PhysicalDeviceData;
+  rdcarray<BufferDescription> m_buffers;
   uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 public:

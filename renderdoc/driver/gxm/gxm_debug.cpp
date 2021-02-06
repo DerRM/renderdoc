@@ -417,6 +417,7 @@ GXMDebugManager::GXMDebugManager(WrappedGXM *driver)
 
   VkResult vkr = VK_SUCCESS;
   
+
   // we need just one descriptor for MS<->Array
   VkDescriptorPoolSize poolTypes[] = {
       {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2},

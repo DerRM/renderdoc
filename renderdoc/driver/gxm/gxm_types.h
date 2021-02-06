@@ -312,4 +312,6 @@ const char *textureSwizzleYUV420Mode2str(SceGxmTextureFormat format);
 const char *textureSwizzleMode2str(SceGxmTextureFormat format);
 const char* textureFormat2str(SceGxmTextureFormat format);
 const char* attributeFormat2str(SceGxmAttributeFormat format);
+const char* parameterType2str(SceGxmParameterType type);
+const char* parameterSemantic2str(SceGxmParameterSemantic semantic);
 }

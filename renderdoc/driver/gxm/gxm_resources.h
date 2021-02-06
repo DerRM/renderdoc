@@ -111,22 +111,24 @@ inline GXMResource MappedBufferRes(uint32_t buffer_addr, uint32_t buffer_size, V
   return res;
 }
 
-inline GXMResource IndexBufferRes(uint32_t buffer_addr, uint32_t buffer_size, VkBuffer buffer)
+inline GXMResource IndexBufferRes(uint32_t buffer_addr, uint32_t buffer_size, VkBuffer buffer, VkDeviceMemory memory)
 {
   GXMResource res(eResIndexBuffer);
   res.addr = buffer_addr;
   res.size = buffer_size;
   res.buffer = buffer;
+  res.memory = memory;
 
   return res;
 }
 
-inline GXMResource VertexBufferRes(uint32_t buffer_addr, uint32_t buffer_size, VkBuffer buffer)
+inline GXMResource VertexBufferRes(uint32_t buffer_addr, uint32_t buffer_size, VkBuffer buffer, VkDeviceMemory memory)
 {
   GXMResource res(eResVertexBuffer);
   res.addr = buffer_addr;
   res.size = buffer_size;
   res.buffer = buffer;
+  res.memory = memory;
 
   return res;
 }

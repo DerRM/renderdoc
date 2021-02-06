@@ -12,6 +12,9 @@ ResourceFormat MakeAttributeFormat(SceGxmAttributeFormat fmt, uint8_t componentC
 
   if (fmt == SCE_GXM_ATTRIBUTE_FORMAT_UNTYPED)
   {
+    ret.compType = CompType::Float;
+    ret.compCount = 4;
+    ret.compByteWidth = 2;
     return ret;
   }
 

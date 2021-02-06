@@ -115,9 +115,9 @@ void GXMReplay::GetBufferData(ResourceId buff, uint64_t offset, uint64_t len, by
   }
 
   byte *pData = NULL;
-  vkMapMemory(m_pDriver->m_vulkanState.m_Device, mapped_res.memory, res.addr - mapped_res.addr + offset, len, 0, (void **)&pData);
+  vkMapMemory(m_pDriver->m_vulkanState.m_Device, res.memory, 0, len, 0, (void **)&pData);
   memcpy(&retData[0], pData, len);
-  vkUnmapMemory(m_pDriver->m_vulkanState.m_Device, mapped_res.memory);
+  vkUnmapMemory(m_pDriver->m_vulkanState.m_Device, res.memory);
 }
 
 void GXMReplay::GetTextureData(ResourceId tex, const Subresource &sub,
@@ -1407,7 +1407,7 @@ rdcarray<ResourceDescription> GXMReplay::GetResources()
 
 rdcarray<BufferDescription> GXMReplay::GetBuffers()
 {
-  return rdcarray<BufferDescription>();
+  return m_pDriver->GetBuffers();
 }
 
 BufferDescription GXMReplay::GetBuffer(ResourceId id)
