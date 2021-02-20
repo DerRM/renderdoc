@@ -130,5 +130,8 @@
     <ClCompile Include="gxm_resources.cpp">
       <Filter>Util</Filter>
     </ClCompile>
+    <ClCompile Include="gxm_postvs.cpp">
+      <Filter>Replay</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

@@ -57,21 +57,11 @@ rdcarray<uint32_t> GXMReplay::GetPassEvents(uint32_t eventId)
   return rdcarray<uint32_t>();
 }
 
-void GXMReplay::InitPostVSBuffers(uint32_t eventId) {}
-
-void GXMReplay::InitPostVSBuffers(const rdcarray<uint32_t> &passEvents) {}
-
 ResourceId GXMReplay::GetLiveID(ResourceId id)
 {
   if(!m_pDriver->GetResourceManager()->HasLiveResource(id))
     return ResourceId();
   return m_pDriver->GetResourceManager()->GetLiveID(id);
-}
-
-MeshFormat GXMReplay::GetPostVSBuffers(uint32_t eventId, uint32_t instID, uint32_t viewID,
-                                       MeshDataStage stage)
-{
-  return MeshFormat();
 }
 
 void GXMReplay::GetBufferData(ResourceId buff, uint64_t offset, uint64_t len, bytebuf &retData)

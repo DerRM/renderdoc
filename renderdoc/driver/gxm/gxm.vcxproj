@@ -178,6 +178,7 @@
     <ClCompile Include="gxm_initstate.cpp" />
     <ClCompile Include="gxm_manager.cpp" />
     <ClCompile Include="gxm_outputwindow.cpp" />
+    <ClCompile Include="gxm_postvs.cpp" />
     <ClCompile Include="gxm_replay.cpp" />
     <ClCompile Include="gxm_resources.cpp" />
     <ClCompile Include="gxm_stringise.cpp" />

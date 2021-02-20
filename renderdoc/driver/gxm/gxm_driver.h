@@ -174,6 +174,9 @@ private:
   bool Serialise_InitBufferResource(SerialiserType &ser);
 
   template <typename SerialiserType>
+  bool Serialise_InitShaderResources(SerialiserType &ser);
+
+  template <typename SerialiserType>
   bool Serialise_CaptureScope(SerialiserType &ser);
 
   void AddRequiredExtensions(bool instance, rdcarray<rdcstr> &extensionList,

@@ -280,6 +280,7 @@ enum class GXMChunk : uint32_t
   ContextConfiguration,
 
   InitBufferResources,
+  InitShaderResources,
 
   Max,
 };

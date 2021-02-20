@@ -350,6 +350,21 @@ bool WrappedGXM::Serialise_InitBufferResource(SerialiserType &ser)
 }
 
 template <typename SerialiserType>
+bool WrappedGXM::Serialise_InitShaderResources(SerialiserType &ser)
+{
+  ResourceId shader;
+  SERIALISE_ELEMENT(shader);
+
+  uint32_t program_size;
+  SERIALISE_ELEMENT(program_size);
+
+  const void *programData;
+  SERIALISE_ELEMENT_ARRAY(programData, program_size + (4 - (program_size % 4)));
+
+  return true;
+}
+
+template <typename SerialiserType>
 bool WrappedGXM::Serialise_CaptureScope(SerialiserType &ser)
 {
   uint32_t framecount;
@@ -652,6 +667,7 @@ bool WrappedGXM::ProcessChunk(ReadSerialiser &ser, GXMChunk chunk)
     case GXMChunk::sceGxmWaitEvent: break;
     case GXMChunk::ContextConfiguration: return Serialise_ContextConfiguration(ser, NULL);
     case GXMChunk::InitBufferResources: return Serialise_InitBufferResource(ser);
+    case GXMChunk::InitShaderResources: return Serialise_InitShaderResources(ser);
     case GXMChunk::Max: break;
     default: break;
   }

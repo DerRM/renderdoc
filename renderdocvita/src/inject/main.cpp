@@ -107,6 +107,17 @@ struct MappedMemory
 MappedMemory* g_memoryArray = NULL;
 uint32_t g_mappedMemoryCount = 0;
 
+struct ShaderProgram
+{
+    SceGxmShaderPatcherId programId;
+    uint32_t referenced;
+    int64_t resId;
+};
+
+#define MAX_SHADER_PROGRAM_COUNT 1024
+ShaderProgram* g_shaderProgramArray = NULL;
+uint32_t g_shaderProgramCount = 0;
+
 const SceGxmVertexProgram * g_activeVertexProgram = NULL;
 struct VertexStream
 {
@@ -1059,6 +1070,37 @@ static void serializeBuffers()
     }
 }
 
+static void serializeShaders() 
+{
+    uint32_t chunkSize = 0;
+
+    LOG("shader program count %" PRIu32 "\n", g_shaderProgramCount);
+
+    for (uint32_t shader_index = 0; shader_index < g_shaderProgramCount; ++shader_index) {
+        if (g_shaderProgramArray[shader_index].referenced) {
+            ShaderProgram &shader = g_shaderProgramArray[shader_index];
+            GXMChunk type = GXMChunk::InitShaderResources;
+
+            g_fileoffset += g_file.write(type);
+            g_fileoffset += g_file.write(chunkSize);
+            g_fileoffset += g_file.write(shader.resId);
+            const ProgramHeader* program = (const ProgramHeader*)sceGxmShaderPatcherGetProgramFromId(shader.programId);
+
+            LOG("shader program Id: %p, length: %" PRIu32 "\n", shader.programId, program->length);
+
+            g_fileoffset += g_file.write(program->length);
+            g_fileoffset += g_file.write((uint64_t)program->length + (4 - (program->length % 4)));
+
+            g_fileoffset += ALIGN_TO_64(g_fileoffset);
+            g_fileoffset += g_file.write(program, program->length + (4 - (program->length % 4)));
+
+            g_fileoffset += ALIGN_TO_64(g_fileoffset);
+
+            LOG("referenced shader: %" PRIi32 "\n", shader_index);
+        }
+    }
+}
+
 char fname[256];
 
 CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer, SceGxmSyncObject *newBuffer, const void *callbackData)
@@ -1142,6 +1184,7 @@ CREATE_PATCHED_CALL(int, sceGxmDisplayQueueAddEntry, SceGxmSyncObject *oldBuffer
 
         // TODO: serialize used resources here
         serializeBuffers();
+        serializeShaders();
 
         uint64_t bufferfilesize = g_fileoffset;
         LOG("bufferfilesize: %" PRIu64 "\n", bufferfilesize);
@@ -1967,6 +2010,16 @@ CREATE_PATCHED_CALL(void, sceGxmSetFragmentProgram, SceGxmContext *context, cons
         g_fileoffset += g_file.write(fragmentProgram);
 
         g_fileoffset += ALIGN_TO_64(g_fileoffset);
+
+        FragmentProgramResource fragmentRes;
+        g_resource_manager.find(GXMType::SceGxmFragmentProgram, (uint32_t)fragmentProgram, &fragmentRes);
+
+        for (uint32_t shader_index = 0; shader_index < g_shaderProgramCount; ++shader_index) {
+            if (g_shaderProgramArray[shader_index].programId == fragmentRes.programId) {
+                g_shaderProgramArray[shader_index].referenced = 1;
+                break;
+            }
+        }
     }
 
     LOGD("sceGxmSetFragmentProgram(context: %p, fragmentProgram: %p)\n", context, fragmentProgram);
@@ -2235,6 +2288,13 @@ CREATE_PATCHED_CALL(void, sceGxmSetVertexProgram, SceGxmContext *context, const 
                 }
             }
         }
+
+        for (uint32_t shader_index = 0; shader_index < g_shaderProgramCount; ++shader_index) {
+            if (g_shaderProgramArray[shader_index].programId == vertexRes.programId) {
+                g_shaderProgramArray[shader_index].referenced = 1;
+                break;
+            }
+        }
     }
 
     LOGD("sceGxmSetVertexProgram(context: %p, vertexProgram: %p)\n", context, vertexProgram);
@@ -2481,23 +2541,23 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherRegisterProgram, SceGxmShaderPatcher
 {
     int res = TAI_NEXT(sceGxmShaderPatcherRegisterProgram, sceGxmShaderPatcherRegisterProgramRef, shaderPatcher, programHeader, programId);
 
-    if (g_log && programHeader) {
+    if (programHeader) {
         ++shadercount;
         ProgramHeader* header = (ProgramHeader*)programHeader;
-        GXMType type = GXMType::SceGxmProgram;
+        //GXMType type = GXMType::SceGxmProgram;
 
         LOGD("program #%" PRIu32" header: magic: %s, version: %" PRIu32 ", byte length: %" PRIu32 ", padded length: %" PRIu32 ", id_size: %" PRIu32 ", id: %" PRIu32 "\n", shadercount, header->magic, header->version, header->length, header->length + (4 - (header->length % 4)), sizeof(SceGxmShaderPatcherId), *programId);
 
-        ProgramResource programRes;
-        programRes.type = type;
-        programRes.id = (uint32_t)*programId;
+        // ProgramResource programRes;
+        // programRes.type = type;
+        // programRes.id = (uint32_t)*programId;
 
-        programRes.programId = *programId;
-        programRes.size += sizeof(*programId);
-        programRes.programLength = header->length + (4 - (header->length % 4));
-        programRes.size += sizeof(uint32_t);
-        programRes.program = programHeader;
-        programRes.size += programRes.programLength;
+        // programRes.programId = *programId;
+        // programRes.size += sizeof(*programId);
+        // programRes.programLength = header->length + (4 - (header->length % 4));
+        // programRes.size += sizeof(uint32_t);
+        // programRes.program = programHeader;
+        // programRes.size += programRes.programLength;
 
         uint32_t parameter_count = sceGxmProgramGetParameterCount(programHeader);
         LOGD("Register program: parameter count %" PRIu32 "\n", parameter_count);
@@ -2509,7 +2569,27 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherRegisterProgram, SceGxmShaderPatcher
             LOGD("Parameter[%" PRIu32 "] name: %s, resource index: %" PRIu32 "\n", parameter_index, name, resIndex);
         }
 
-        g_resource_manager.add(&programRes);
+        bool found = false;
+        for (uint32_t shader_index = 0; shader_index < g_shaderProgramCount; ++shader_index) {
+            if (g_shaderProgramArray[shader_index].programId == *programId) {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            if ((g_shaderProgramCount + 1) < MAX_SHADER_PROGRAM_COUNT) {
+                g_shaderProgramArray[g_shaderProgramCount].resId = ++g_resourceid;
+                g_shaderProgramArray[g_shaderProgramCount].programId = *programId;
+                g_shaderProgramArray[g_shaderProgramCount].referenced = 0;
+                ++g_shaderProgramCount;
+            }
+            else {
+                LOG("too many shader programs registered\n");
+            }
+        }
+
+        //g_resource_manager.add(&programRes);
     }
 
     LOGD("sceGxmShaderPatcherRegisterProgram(shaderPatcher: %p, programHeader: %p, programId: %p)\n", shaderPatcher, programHeader, programId);
@@ -2542,6 +2622,25 @@ CREATE_PATCHED_CALL(int, sceGxmShaderPatcherSetUserData, SceGxmShaderPatcher *sh
 
 CREATE_PATCHED_CALL(int, sceGxmShaderPatcherUnregisterProgram, SceGxmShaderPatcher *shaderPatcher, SceGxmShaderPatcherId programId)
 {
+    for (uint32_t shader_index = 0; shader_index < g_shaderProgramCount; ++shader_index) {
+        if (g_shaderProgramArray[shader_index].programId == programId) {
+            
+             if (shader_index == g_shaderProgramCount - 1) {
+                g_shaderProgramArray[shader_index].programId = NULL;
+                g_shaderProgramArray[shader_index].resId = 0;
+                g_shaderProgramArray[shader_index].referenced = 0;
+            }
+            else {
+                ShaderProgram tmp = g_shaderProgramArray[g_shaderProgramCount - 1];
+                g_shaderProgramArray[shader_index] = tmp;
+                --g_shaderProgramCount;
+            }
+
+            break;
+        }
+    }
+
+
     LOGD("sceGxmShaderPatcherUnregisterProgram(shaderPatcher: %p, programId: %p)\n", shaderPatcher, programId);
     return TAI_NEXT(sceGxmShaderPatcherUnregisterProgram, sceGxmShaderPatcherUnregisterProgramRef, shaderPatcher, programId);
 }
@@ -3522,6 +3621,7 @@ int module_start(SceSize args, void *argp) {
     LOG("CDialog allocation: memuid: %" PRIi32 ", base addr: %p\n", memuid, g_baseAddr);
 
     g_memoryArray = new(g_baseAddr)MappedMemory[MAX_MAPPED_MEMORY_COUNT];
+    g_shaderProgramArray = new((void*)((uint8_t*)g_baseAddr + sizeof(MappedMemory) * MAX_MAPPED_MEMORY_COUNT))ShaderProgram[MAX_SHADER_PROGRAM_COUNT];
 
     return SCE_KERNEL_START_SUCCESS;
 }
