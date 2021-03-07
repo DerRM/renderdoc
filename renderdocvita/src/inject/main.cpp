@@ -2195,6 +2195,12 @@ CREATE_PATCHED_CALL(void, sceGxmSetTwoSidedEnable, SceGxmContext *context, SceGx
 
 CREATE_PATCHED_CALL(int, sceGxmSetUniformDataF, void *uniformBuffer, const SceGxmProgramParameter *parameter, unsigned int componentOffset, unsigned int componentCount, const float *sourceData)
 {
+    int ret = TAI_NEXT(sceGxmSetUniformDataF, sceGxmSetUniformDataFRef, uniformBuffer, parameter, componentOffset, componentCount, sourceData);
+
+    if (ret != SCE_OK) {
+        return ret;
+    }
+
     if (g_log) {
         uint32_t chunkSize = 0;
 
@@ -2202,16 +2208,56 @@ CREATE_PATCHED_CALL(int, sceGxmSetUniformDataF, void *uniformBuffer, const SceGx
         g_fileoffset += g_file.write(type);
         g_fileoffset += g_file.write(chunkSize);
         g_fileoffset += g_file.write(uniformBuffer);
-        g_fileoffset += g_file.write(parameter);
         g_fileoffset += g_file.write(componentOffset);
         g_fileoffset += g_file.write(componentCount);
-        g_fileoffset += g_file.write(sourceData);
+
+        uint32_t byte_size = 0;
+        uint32_t correct_offset = 0;
+
+        SceGxmParameterType param_type = sceGxmProgramParameterGetType(parameter);
+        switch (param_type) {    
+            case SCE_GXM_PARAMETER_TYPE_F32:
+            case SCE_GXM_PARAMETER_TYPE_F16:
+            case SCE_GXM_PARAMETER_TYPE_U32:
+            case SCE_GXM_PARAMETER_TYPE_S32:
+            case SCE_GXM_PARAMETER_TYPE_U16:
+            case SCE_GXM_PARAMETER_TYPE_S16:
+            case SCE_GXM_PARAMETER_TYPE_C10:
+            case SCE_GXM_PARAMETER_TYPE_S8:
+            case SCE_GXM_PARAMETER_TYPE_U8: {
+                byte_size = 4 * componentCount;
+                correct_offset = (componentCount > 1) ? (4 * componentOffset) : 0;
+                byte_size -= correct_offset;
+            } break;
+            case SCE_GXM_PARAMETER_TYPE_AGGREGATE: // if SceGxmParameterCategory == SCE_GXM_PARAMETER_CATEGORY_UNIFORM_BUFFER
+                // TODO: byte_size = sizeof(current_uniform_buffer)
+                break;
+        }
+
+        g_fileoffset += g_file.write((uint32_t)param_type);
+
+        uint32_t res_index = sceGxmProgramParameterGetResourceIndex(parameter);
+
+        g_fileoffset += g_file.write(res_index);
+
+        const char* name = sceGxmProgramParameterGetName(parameter);
+        uint32_t str_len = strlen(name);
+
+        g_fileoffset += g_file.write(str_len);
+        g_fileoffset += g_file.write(name, str_len);
+
+        const uint8_t *data = reinterpret_cast<const uint8_t *>(sourceData);
+
+        g_fileoffset += g_file.write((uint64_t)byte_size);
+
+        g_fileoffset += ALIGN_TO_64(g_fileoffset);
+        g_fileoffset += g_file.write((data + correct_offset), byte_size);
 
         g_fileoffset += ALIGN_TO_64(g_fileoffset);
     }
 
     LOGD("sceGxmSetUniformDataF(uniformBuffer, %p, parameter: %p, componentOffset: %" PRIu32 ", componentCount: %" PRIu32 ", sourceData: %p)\n", uniformBuffer, parameter, componentOffset, componentCount, sourceData);
-    return TAI_NEXT(sceGxmSetUniformDataF, sceGxmSetUniformDataFRef, uniformBuffer, parameter, componentOffset, componentCount, sourceData);
+    return ret;
 }
 
 CREATE_PATCHED_CALL(int, sceGxmSetUserMarker, SceGxmContext *context, const char *tag)

@@ -314,7 +314,6 @@ bool WrappedGXM::Serialise_InitBufferResource(SerialiserType &ser)
         RDCERR("vkAllocateMemory failed");
       }
 
-
       result = vkBindBufferMemory(m_vulkanState.m_Device, vkbuffer, bufferMemory, 0);
       if(result != VK_SUCCESS)
       {
@@ -360,6 +359,9 @@ bool WrappedGXM::Serialise_InitShaderResources(SerialiserType &ser)
 
   const void *programData;
   SERIALISE_ELEMENT_ARRAY(programData, program_size + (4 - (program_size % 4)));
+  rdcarray<uint8_t> data;
+  data.assign((const uint8_t*)programData, program_size + (4 - (program_size % 4)));
+  m_shaders.push_back(data);
 
   return true;
 }
@@ -787,6 +789,11 @@ VkBool32 VKAPI_PTR WrappedGXM::DebugUtilsCallbackStatic(
 rdcarray<BufferDescription> WrappedGXM::GetBuffers()
 {
   return m_buffers;
+}
+
+rdcarray<rdcarray<uint8_t>> WrappedGXM::GetShaders()
+{
+  return m_shaders;
 }
 
 ReplayStatus WrappedGXM::Initialise()

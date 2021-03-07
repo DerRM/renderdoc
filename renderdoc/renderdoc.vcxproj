@@ -667,6 +667,9 @@
     <ProjectReference Include="driver\ihv\nv\NV.vcxproj">
       <Project>{40349ad9-5558-4df4-84e2-11934de90a11}</Project>
     </ProjectReference>
+    <ProjectReference Include="driver\shaders\gxp\gxp.vcxproj">
+      <Project>{f4791bf2-c440-4e72-bb7c-90a289d69093}</Project>
+    </ProjectReference>
     <ProjectReference Include="driver\vulkan\renderdoc_vulkan.vcxproj">
       <Project>{88c5dac6-30a0-4cfd-af51-540a977d1f3f}</Project>
     </ProjectReference>

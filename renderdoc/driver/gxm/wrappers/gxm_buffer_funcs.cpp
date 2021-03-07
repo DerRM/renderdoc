@@ -88,14 +88,50 @@ bool WrappedGXM::Serialise_sceGxmSetUniformDataF(SerialiserType &ser, void *unif
                                                  unsigned int componentCount, const float *sourceData)
 {
   SERIALISE_ELEMENT_TYPED(uint32_t, uniformBuffer);
-  SERIALISE_ELEMENT_TYPED(uint32_t, parameter);
   SERIALISE_ELEMENT(componentOffset);
   SERIALISE_ELEMENT(componentCount);
-  SERIALISE_ELEMENT_TYPED(uint32_t, sourceData);
+  SceGxmParameterType param_type;
+  SERIALISE_ELEMENT(param_type);
+
+  uint32_t resource_index = 0;
+  SERIALISE_ELEMENT(resource_index);
+
+  const char *name = nullptr;
+  SERIALISE_ELEMENT(name);
+
+  uint32_t byte_size = 0;
+  uint32_t correct_offset = 0;
+
+  switch(param_type)
+  {
+    case SCE_GXM_PARAMETER_TYPE_F32:
+    case SCE_GXM_PARAMETER_TYPE_F16:
+    case SCE_GXM_PARAMETER_TYPE_U32:
+    case SCE_GXM_PARAMETER_TYPE_S32:
+    case SCE_GXM_PARAMETER_TYPE_U16:
+    case SCE_GXM_PARAMETER_TYPE_S16:
+    case SCE_GXM_PARAMETER_TYPE_C10:
+    case SCE_GXM_PARAMETER_TYPE_S8:
+    case SCE_GXM_PARAMETER_TYPE_U8:
+    {
+      byte_size = 4 * componentCount;
+      correct_offset = (componentCount > 1) ? (4 * componentOffset) : 0;
+      byte_size -= correct_offset;
+    }
+    break;
+    case SCE_GXM_PARAMETER_TYPE_AGGREGATE:    // if SceGxmParameterCategory == SCE_GXM_PARAMETER_CATEGORY_UNIFORM_BUFFER
+      // TODO: byte_size = sizeof(current_uniform_buffer)
+      break;
+  }
+
+  const void *uniformData;
+  SERIALISE_ELEMENT_ARRAY(uniformData, byte_size);
 
   RDCLOG("sceGxmSetUniformDataF(uniformBuffer, 0x%x, parameter: 0x%x, componentOffset: %" PRIu32
          ", componentCount: %" PRIu32 ", sourceData: 0x%x)",
          uniformBuffer, parameter, componentOffset, componentCount, sourceData);
+
+
 
   return true;
 }

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Development|Win32">
@@ -18,10 +18,67 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="features\state.h" />
+    <ClInclude Include="gxm\functions.h" />
+    <ClInclude Include="gxm\state.h" />
+    <ClInclude Include="gxm\types.h" />
+    <ClInclude Include="gxm\types_.h" />
+    <ClInclude Include="mem\mem.h" />
+    <ClInclude Include="mem\ptr.h" />
+    <ClInclude Include="shader\decoder_detail.h" />
+    <ClInclude Include="shader\gxp_parser.h" />
+    <ClInclude Include="shader\matcher.h" />
+    <ClInclude Include="shader\profile.h" />
+    <ClInclude Include="shader\spirv.hpp" />
+    <ClInclude Include="shader\spirv_cfg.hpp" />
+    <ClInclude Include="shader\spirv_common.hpp" />
+    <ClInclude Include="shader\spirv_cross.hpp" />
+    <ClInclude Include="shader\spirv_cross_containers.hpp" />
+    <ClInclude Include="shader\spirv_cross_error_handling.hpp" />
+    <ClInclude Include="shader\spirv_cross_parsed_ir.hpp" />
+    <ClInclude Include="shader\spirv_glsl.hpp" />
+    <ClInclude Include="shader\spirv_recompiler.h" />
+    <ClInclude Include="shader\types_imm.h" />
+    <ClInclude Include="shader\usse_constant_table.h" />
+    <ClInclude Include="shader\usse_decoder_helpers.h" />
+    <ClInclude Include="shader\usse_disasm.h" />
+    <ClInclude Include="shader\usse_program_analyzer.h" />
+    <ClInclude Include="shader\usse_translator.h" />
+    <ClInclude Include="shader\usse_translator_entry.h" />
+    <ClInclude Include="shader\usse_translator_types.h" />
+    <ClInclude Include="shader\usse_types.h" />
+    <ClInclude Include="shader\usse_utilities.h" />
+    <ClInclude Include="util\align.h" />
+    <ClInclude Include="util\function_info.h" />
+    <ClInclude Include="util\log.h" />
+    <ClInclude Include="util\overloaded.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="alu.cpp" />
+    <ClCompile Include="branch_cond.cpp" />
+    <ClCompile Include="data.cpp" />
+    <ClCompile Include="gxp.cpp" />
+    <ClCompile Include="gxp_parser.cpp" />
+    <ClCompile Include="ialu.cpp" />
+    <ClCompile Include="illegal.cpp" />
+    <ClCompile Include="special.cpp" />
+    <ClCompile Include="spirv_recompiler.cpp" />
+    <ClCompile Include="texture.cpp" />
+    <ClCompile Include="usse_decode_helpers.cpp" />
+    <ClCompile Include="usse_disasm.cpp" />
+    <ClCompile Include="usse_program_analyzer.cpp" />
+    <ClCompile Include="usse_translator_entry.cpp" />
+    <ClCompile Include="usse_utilities.cpp" />
+    <ClCompile Include="utils.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shader\usse_opcodes.inc" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{D88F4D2D-2CC9-406A-8736-EF4A3E9ED846}</ProjectGuid>
-    <RootNamespace>gxm</RootNamespace>
+    <ProjectGuid>{F4791BF2-C440-4E72-BB7C-90A289D69093}</ProjectGuid>
+    <RootNamespace>gxp</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -45,11 +102,11 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -70,34 +127,30 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
-    <IncludePath>$(SolutionDir)\breakpad;$(IncludePath)</IncludePath>
-    <TargetName>driver_$(ProjectName)</TargetName>
-    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\obj\$(ProjectName)\</IntDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(SolutionDir)\breakpad;$(IncludePath)</IncludePath>
     <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\obj\$(ProjectName)\</IntDir>
     <TargetName>driver_$(ProjectName)</TargetName>
+    <TargetExt>.lib</TargetExt>
+    <ExecutablePath>$(ExecutablePath)</ExecutablePath>
+    <IncludePath>$(SolutionDir)\breakpad;$(IncludePath)</IncludePath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <ExcludePath>$(ExcludePath)</ExcludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
     <ClCompile>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>
       </SDLCheck>
       <ConformanceMode>false</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)renderdoc\;$(SolutionDir)renderdoc\3rdparty\</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>VK_USE_PLATFORM_WIN32_KHR;VK_NO_PROTOTYPES;RENDERDOC_EXPORTS;RENDERDOC_PLATFORM_WIN32;WIN32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/w44062 %(AdditionalOptions)</AdditionalOptions>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4100</DisableSpecificWarnings>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>AMD_EXTENSIONS;NV_EXTENSIONS;GLSLANG_OSINCLUDE_WIN32;RENDERDOC_EXPORTS;RENDERDOC_PLATFORM_WIN32;WIN32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>precompiled.h</PrecompiledHeaderFile>
-      <DisableSpecificWarnings>4100;4201</DisableSpecificWarnings>
-      <ForcedIncludeFiles>precompiled.h</ForcedIncludeFiles>
-      <AdditionalOptions>/w44062 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -132,19 +185,12 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>
-      </SDLCheck>
+      <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)renderdoc\;$(SolutionDir)renderdoc\3rdparty\</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>VK_USE_PLATFORM_WIN32_KHR;VK_NO_PROTOTYPES;RENDERDOC_EXPORTS;RENDERDOC_PLATFORM_WIN32;WIN32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <TreatWarningAsError>true</TreatWarningAsError>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <SupportJustMyCode>true</SupportJustMyCode>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -152,49 +198,6 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClInclude Include="gxm_common.h" />
-    <ClInclude Include="gxm_core.h" />
-    <ClInclude Include="gxm_debug.h" />
-    <ClInclude Include="gxm_driver.h" />
-    <ClInclude Include="gxm_enum.h" />
-    <ClInclude Include="gxm_initstate.h" />
-    <ClInclude Include="gxm_manager.h" />
-    <ClInclude Include="gxm_replay.h" />
-    <ClInclude Include="gxm_resources.h" />
-    <ClInclude Include="gxm_state.h" />
-    <ClInclude Include="gxm_types.h" />
-    <ClInclude Include="gxm_vk_info.h" />
-    <ClInclude Include="gxm_vk_loader.h" />
-    <ClInclude Include="gxm_vk_shader_cache.h" />
-    <ClInclude Include="official\gxm.h" />
-    <ClInclude Include="official\types.h" />
-    <ClInclude Include="precompiled.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="gxm_common.cpp" />
-    <ClCompile Include="gxm_core.cpp" />
-    <ClCompile Include="gxm_debug.cpp" />
-    <ClCompile Include="gxm_driver.cpp" />
-    <ClCompile Include="gxm_initstate.cpp" />
-    <ClCompile Include="gxm_manager.cpp" />
-    <ClCompile Include="gxm_outputwindow.cpp" />
-    <ClCompile Include="gxm_postvs.cpp" />
-    <ClCompile Include="gxm_replay.cpp" />
-    <ClCompile Include="gxm_resources.cpp" />
-    <ClCompile Include="gxm_stringise.cpp" />
-    <ClCompile Include="gxm_types.cpp" />
-    <ClCompile Include="gxm_vk_info.cpp" />
-    <ClCompile Include="gxm_vk_loader.cpp" />
-    <ClCompile Include="gxm_vk_shader_cache.cpp" />
-    <ClCompile Include="gxm_win32.cpp" />
-    <ClCompile Include="precompiled.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Create</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="wrappers\gxm_buffer_funcs.cpp" />
-    <ClCompile Include="wrappers\gxm_draw_funcs.cpp" />
-    <ClCompile Include="wrappers\gxm_state_funcs.cpp" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

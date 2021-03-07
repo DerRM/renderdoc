@@ -156,6 +156,7 @@ public:
 
   GXMDebugManager *GetDebugManager() { return m_DebugManager; }
   rdcarray<BufferDescription> GetBuffers();
+  rdcarray<rdcarray<uint8_t>> GetShaders();
 
 private:
   void AddEvent();
@@ -202,6 +203,8 @@ private:
   PhysicalDeviceData m_PhysicalDeviceData;
   rdcarray<BufferDescription> m_buffers;
   uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+  rdcarray<rdcarray<uint8_t>> m_shaders;
 
 public:
   IMPLEMENT_FUNCTION_SERIALISED(int, sceGxmInitialize, const SceGxmInitializeParams *params);
