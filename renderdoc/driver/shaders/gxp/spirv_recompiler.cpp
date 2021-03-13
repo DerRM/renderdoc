@@ -47,6 +47,8 @@
 #include <utility>
 #include <vector>
 
+#include <common/common.h>
+
 static constexpr bool LOG_SHADER_CODE = true;
 static constexpr bool DUMP_SPIRV_BINARIES = false;
 
@@ -175,7 +177,7 @@ static spv::Id get_type_basic(spv::Builder &b, const Input &input)
     // clang-format on
     default:
     {
-      LOG_ERROR("Unsupported parameter type %s used in shader.\n", log_hex(input.type).c_str());
+      RDCERR("Unsupported parameter type %s used in shader.", log_hex(input.type).c_str());
       return get_type_fallback(b);
     }
   }
@@ -253,7 +255,7 @@ spv::StorageClass reg_type_to_spv_storage_class(usse::RegisterBank reg_type)
     default: return spv::StorageClassMax;
   }
 
-  LOG_WARN("Unsupported reg_type %" PRIu32 "\n", static_cast<uint32_t>(reg_type));
+  RDCWARN("Unsupported reg_type %" PRIu32, static_cast<uint32_t>(reg_type));
   return spv::StorageClassMax;
 }
 
@@ -340,7 +342,10 @@ static spv::Id create_builtin_sampler(spv::Builder &b, const FeatureState &featu
 
   spv::Id image_type =
       b.makeImageType(sampled_type, spv::Dim2D, false, false, false, sampled, img_format);
-  spv::Id sampler = b.createVariable(spv::StorageClassUniformConstant, image_type, name.c_str());
+  spv::Id sampler = b.createVariable(spv::StorageClassInput, image_type, name.c_str());
+  b.addDecoration(sampler, spv::DecorationDescriptorSet, 0);
+  b.addDecoration(sampler, spv::DecorationBinding, 0);
+  b.addDecoration(sampler, spv::DecorationLocation, 0);
   translation_state.interfaces.push_back(sampler);
 
   return sampler;
@@ -450,7 +455,7 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
 
       translation_state.var_to_regs.push_back({pa_iter_var, true, pa_offset, pa_iter_size, pa_dtype});
       translation_state.interfaces.push_back(pa_iter_var);
-      LOG_DEBUG("Iterator: pa%" PRIu32 " = (%s%" PRIu32 ") %s\n", pa_offset, pa_type.c_str(),
+      RDCDEBUG("Iterator: pa%" PRIu32 " = (%s%" PRIu32 ") %s", pa_offset, pa_type.c_str(),
                 num_comp, pa_name.c_str());
 
       if(input_id >= 0 && input_id <= 0x9000)
@@ -495,7 +500,7 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
 
       if(tex_name.empty())
       {
-        LOG_INFO("Sample symbol stripped, using anonymous name");
+        RDCLOG("Sample symbol stripped, using anonymous name");
 
         anonymous = true;
         tex_name = std::string("anonymousTexture") + std::to_string(anon_tex_count++);
@@ -517,7 +522,7 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
         case 1:
         {
           // Maybe char?
-          LOG_WARN("Unsupported texture component: %" PRIu32 "\n", component_type);
+          RDCWARN("Unsupported texture component: %" PRIu32, component_type);
           break;
         }
         case 2:
@@ -532,7 +537,7 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
           store_type = DataType::F32;
           break;
         }
-        default: { LOG_WARN("Unsupported texture component: %" PRIu32 "\n", component_type);
+        default: { RDCWARN("Unsupported texture component: %" PRIu32, component_type);
         }
       }
 
@@ -773,15 +778,16 @@ static spv::Id create_uniform_block(spv::Builder &b, const FeatureState &feature
   // Create the default reg uniform buffer
   spv::Id default_buffer_type = b.makeStructType({vec4_arr_type}, name_type.c_str());
   b.addDecoration(default_buffer_type, spv::DecorationBlock);
-  b.addDecoration(default_buffer_type, spv::DecorationGLSLShared);
+  // b.addDecoration(default_buffer_type, spv::DecorationGLSLShared);
 
   // Default uniform buffer always has binding of 0
-  const std::string buffer_var_name = std::string("buffer{}") + std::to_string(base_binding);
+  const std::string buffer_var_name = std::string("buffer") + std::to_string(base_binding);
   spv::Id default_buffer =
       b.createVariable(spv::StorageClassUniform, default_buffer_type, buffer_var_name.c_str());
-  if(features.use_shader_binding)
-    b.addDecoration(default_buffer, spv::DecorationBinding, ((!is_vert) ? 16 : 0) + base_binding);
+  // if(features.use_shader_binding)
+  b.addDecoration(default_buffer, spv::DecorationBinding, ((!is_vert) ? 16 : 0) + base_binding);
 
+  b.addDecoration(default_buffer, spv::DecorationDescriptorSet, 0);
   b.addMemberDecoration(default_buffer_type, 0, spv::DecorationOffset, 0);
   b.addDecoration(vec4_arr_type, spv::DecorationArrayStride, 16);
   b.addMemberName(default_buffer_type, 0, "data");
@@ -821,6 +827,14 @@ static SpirvShaderParameters create_parameters(
   spv_params.indexes = b.createVariable(spv::StorageClassPrivate, index_arr_type, "idx");
   spv_params.outs = b.createVariable(spv::StorageClassPrivate, o_arr_type, "outs");
 
+  /*translation_state.interfaces.push_back(spv_params.ins);
+  translation_state.interfaces.push_back(spv_params.uniforms);
+  translation_state.interfaces.push_back(spv_params.internals);
+  translation_state.interfaces.push_back(spv_params.temps);
+  translation_state.interfaces.push_back(spv_params.predicates);
+  translation_state.interfaces.push_back(spv_params.indexes);
+  translation_state.interfaces.push_back(spv_params.outs);*/
+
   SamplerMap samplers;
 
   spv::Id ite_copy = b.createVariable(spv::StorageClassFunction, i32_type, "i");
@@ -844,6 +858,7 @@ static SpirvShaderParameters create_parameters(
     spv::Id block =
         create_uniform_block(b, features, buffer.index, buffer_size, !program.is_fragment());
     uniform_buffers.emplace(buffer.index, block);
+    // translation_state.interfaces.push_back(block);
   }
 
   for(const auto &buffer : program_input.uniform_buffers)
@@ -859,6 +874,8 @@ static SpirvShaderParameters create_parameters(
 
   spv::Id memory_type = b.makeArrayType(f32_type, b.makeIntConstant(total_buffer_size * 4 + 1), 0);
   spv_params.memory = b.createVariable(spv::StorageClassPrivate, memory_type, "memory");
+
+  // translation_state.interfaces.push_back(memory_type);
 
   int last_base = 0;
   for(const auto [index, size] : buffer_sizes)
@@ -953,13 +970,15 @@ static SpirvShaderParameters create_parameters(
       std::string param_log =
           std::string("[") + gxp::get_container_name(parameter.container_index) + " + " +
           std::to_string(parameter.resource_index) + "] " + (is_uniform ? "s" : "p") + "a" +
-          std::to_string(offset) + " = (" + param_type_name + std::to_string(parameter.component_count) + ") " + var_name;
+          std::to_string(offset) + " = (" + param_type_name +
+          std::to_string(parameter.component_count) + ") " + var_name;
 
-      if (parameter.array_size > 1) {
-          param_log += std::string("[") + std::to_string(parameter.array_size) + "]";
+      if(parameter.array_size > 1)
+      {
+        param_log += std::string("[") + std::to_string(parameter.array_size) + "]";
       }
 
-      LOG_DEBUG("%s\n", param_log.c_str());
+      RDCDEBUG("%s", param_log.c_str());
     }
   }
 
@@ -1077,7 +1096,7 @@ static SpirvShaderParameters create_parameters(
     // Create the default reg uniform buffer
     spv::Id render_buf_type = b.makeStructType({v4, f32, f32, f32}, "GxmRenderBufferBlock");
     b.addDecoration(render_buf_type, spv::DecorationBlock);
-    b.addDecoration(render_buf_type, spv::DecorationGLSLShared);
+    // b.addDecoration(render_buf_type, spv::DecorationGLSLShared);
 
     b.addMemberDecoration(render_buf_type, 0, spv::DecorationOffset, 0);
     b.addMemberDecoration(render_buf_type, 1, spv::DecorationOffset, 16);
@@ -1092,8 +1111,9 @@ static SpirvShaderParameters create_parameters(
     translation_state.render_info_id =
         b.createVariable(spv::StorageClassUniform, render_buf_type, "renderInfo");
 
-    if(features.use_shader_binding)
-      b.addDecoration(translation_state.render_info_id, spv::DecorationBinding, 15);
+    // if(features.use_shader_binding)
+    b.addDecoration(translation_state.render_info_id, spv::DecorationBinding, 15);
+    b.addDecoration(translation_state.render_info_id, spv::DecorationDescriptorSet, 0);
   }
 
   if(program_type == SceGxmProgramType::SCE_GXM_FRAGMENT_PROGRAM)
@@ -1194,7 +1214,8 @@ static spv::Function *make_frag_finalize_function(spv::Builder &b,
         b.createOp(spv::OpImageRead, v4, {b.createLoad(translate_state.mask_id), current_coord});
     spv::Id rezero = b.makeFloatConstant(0.5f);
     spv::Id zero = b.makeCompositeConstant(v4, {rezero, rezero, rezero, rezero});
-    spv::Id pred = b.createOp(spv::OpFOrdLessThan, b.makeBoolType(), {texel, zero});
+    spv::Id pred =
+        b.createOp(spv::OpFOrdLessThan, b.makeVectorType(b.makeBoolType(), 4), {texel, zero});
     spv::Id pred2 = b.createUnaryOp(spv::OpAll, b.makeBoolType(), pred);
     spv::Builder::If cond_builder(pred2, spv::SelectionControlMaskNone, b);
     b.makeDiscard();
@@ -1298,7 +1319,7 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b,
       const spv::Id out_var =
           b.createVariable(spv::StorageClassOutput, out_type, properties.name.c_str());
 
-      b.addDecoration(out_var, spv::DecorationLocation, properties.location);
+      // b.addDecoration(out_var, spv::DecorationLocation, properties.location);
       translation_state.interfaces.push_back(out_var);
 
       // Do store
@@ -1341,7 +1362,7 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b,
         {
           spv::Id flip_vec_id = b.createAccessChain(
               spv::StorageClassUniform, translation_state.render_info_id, {b.makeIntConstant(0)});
-          o_val2 = b.createBinOp(spv::OpFMul, v4, o_val2, flip_vec_id);
+          o_val2 = b.createBinOp(spv::OpFMul, v4, o_val2, b.createLoad(flip_vec_id));
         }
 
         // o_val2 = (x,y) * (2/width, -2/height) + (-1,1)
@@ -1353,7 +1374,7 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b,
         {
           spv::Id flip_vec_id = b.createAccessChain(
               spv::StorageClassUniform, translation_state.render_info_id, {b.makeIntConstant(0)});
-          o_val = b.createBinOp(spv::OpFMul, out_type, o_val, flip_vec_id);
+          o_val = b.createBinOp(spv::OpFMul, out_type, o_val, b.createLoad(flip_vec_id));
         }
 
         b.createStore(o_val, out_var);
@@ -1361,6 +1382,7 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b,
       }
       else
       {
+        b.addDecoration(out_var, spv::DecorationLocation, properties.location);
         b.createStore(o_val, out_var);
       }
 
@@ -1385,7 +1407,7 @@ static SpirvCode convert_gxp_to_spirv_impl(
   SceGxmProgramType program_type = program.get_type();
 
   spv::SpvBuildLogger spv_logger;
-  spv::Builder b(SPV_VERSION, 0x1337 << 12, &spv_logger);
+  spv::Builder b(0x10300, 0x1337 << 12, &spv_logger);
   b.setSourceFile(shader_hash);
   b.setEmitOpLines();
   b.addSourceExtension("gxp");
@@ -1405,7 +1427,7 @@ static SpirvCode convert_gxp_to_spirv_impl(
 
   switch(program_type)
   {
-    default: LOG_ERROR("Unknown GXM program type");
+    default: RDCERR("Unknown GXM program type");
     // fallthrough
     case SCE_GXM_VERTEX_PROGRAM:
       entry_point_name = "main_vs";
@@ -1433,7 +1455,7 @@ static SpirvCode convert_gxp_to_spirv_impl(
   // broken though.
   if(program_type == SceGxmProgramType::SCE_GXM_FRAGMENT_PROGRAM)
   {
-    b.addExecutionMode(spv_func_main, spv::ExecutionModeOriginLowerLeft);
+    b.addExecutionMode(spv_func_main, spv::ExecutionModeOriginUpperLeft);
 
     if(program.is_native_color() && features.should_use_shader_interlock())
     {
@@ -1495,7 +1517,7 @@ static SpirvCode convert_gxp_to_spirv_impl(
 
   auto spirv_log = spv_logger.getAllMessages();
   if(!spirv_log.empty())
-    LOG_ERROR("SPIR-V Error:\n%s\n", spirv_log.c_str());
+    RDCERR("SPIR-V Error:\n%s", spirv_log.c_str());
 
   if(dumper)
   {
@@ -1504,7 +1526,7 @@ static SpirvCode convert_gxp_to_spirv_impl(
 
   b.dump(spirv);
 
-  if(LOG_SHADER_CODE || force_shader_debug)
+  /*if(LOG_SHADER_CODE || force_shader_debug)
   {
     std::string spirv_dump;
     spirv_disasm_print(spirv, &spirv_dump);
@@ -1512,7 +1534,7 @@ static SpirvCode convert_gxp_to_spirv_impl(
     {
       dumper("spv", spirv_dump);
     }
-  }
+  }*/
 
   if(DUMP_SPIRV_BINARIES)
   {

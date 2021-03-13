@@ -21,6 +21,9 @@
 #include <driver/shaders/gxp/util/log.h>
 
 #include <assert.h>
+#include <inttypes.h>
+
+#include <common/common.h>
 
 namespace gxp {
 
@@ -71,8 +74,8 @@ void log_parameter(const SceGxmProgramParameter &parameter) {
         category = "Unknown type";
         break;
     }
-    //LOG_DEBUG("{}: name:{:s} semantic:{} type:{:d} component_count:{} container_index:{}",
-    //    category, parameter_name_raw(parameter), log_parameter_semantic(parameter), parameter.type, uint8_t(parameter.component_count), log_hex(uint8_t(parameter.container_index)));
+    LOG_DEBUG("%s: name:%s semantic:%s type:%" PRIu16 " component_count:%" PRIu8 " container_index:%s",
+        category.c_str(), parameter_name_raw(parameter).c_str(), log_parameter_semantic(parameter), parameter.type, uint8_t(parameter.component_count), std::to_string(uint8_t(parameter.container_index)).c_str());
 }
 
 const int get_parameter_type_size(const SceGxmParameterType type) {

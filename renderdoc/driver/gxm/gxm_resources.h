@@ -133,9 +133,11 @@ inline GXMResource VertexBufferRes(uint32_t buffer_addr, uint32_t buffer_size, V
   return res;
 }
 
-inline GXMResource ShaderRes()
+inline GXMResource ShaderRes(VkShaderModule shader)
 {
-  return GXMResource(eResShader);
+  GXMResource res(eResShader);
+  res.shader = shader;
+  return res;
 }
 inline GXMResource ProgramRes()
 {

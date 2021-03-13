@@ -20,16 +20,16 @@ MeshFormat GXMReplay::GetPostVSBuffers(uint32_t eventId, uint32_t instID, uint32
                                        MeshDataStage stage)
 {
 
-  rdcarray<rdcarray<uint8_t>> shaders = m_pDriver->GetShaders();
+//  rdcarray<rdcarray<uint8_t>> shaders = m_pDriver->GetShaders();
 
-  if(shaders.size() >= 1)
-  {
-    SceGxmProgram *program = (SceGxmProgram*)&shaders[4][0];
-    SceGxmProgramType type = program->get_type();
-    (void)type;
+//  if(shaders.size() >= 1)
+//  {
+//    SceGxmProgram *program = (SceGxmProgram*)&shaders[4][0];
+//    SceGxmProgramType type = program->get_type();
+//    (void)type;
 
-    FeatureState features;
-    shader::usse::SpirvCode spirv = shader::convert_gxp_to_spirv(*program, "shader", features);
+    //FeatureState features;
+    //shader::usse::SpirvCode spirv = shader::convert_gxp_to_spirv(*program, "shader", features);
 
    // const SceGxmProgramParameter* parameters = program_parameters(*program);
   //  for(uint32_t param_index = 0; param_index < program->parameter_count; ++param_index)
@@ -38,7 +38,7 @@ MeshFormat GXMReplay::GetPostVSBuffers(uint32_t eventId, uint32_t instID, uint32
 
   //    RDCLOG("parameter name: %s", parameter_name_raw(param).c_str());
   //  }
-  }
+  //}
 
   return MeshFormat();
 }

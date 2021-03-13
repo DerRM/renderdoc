@@ -23,7 +23,10 @@
 #include "shader/usse_decoder_helpers.h"
 #include "shader/usse_disasm.h"
 #include "shader/usse_types.h"
-//#include <util/log.h>
+
+#include <iomanip>
+
+#include <common/common.h>
 
 using namespace shader;
 using namespace usse;
@@ -79,7 +82,7 @@ bool USSETranslatorVisitor::vbw(
     spv::Id src2 = 0;
 
     if (src1 == spv::NoResult) {
-      //  LOG_ERROR("Source not loaded");
+        RDCERR("Source not loaded");
         return false;
     }
 
@@ -87,7 +90,7 @@ bool USSETranslatorVisitor::vbw(
     uint32_t value = 0;
 
     if (src2_rot) {
-      //  LOG_WARN("Bitwise Rotations are unsupported.");
+        RDCWARN("Bitwise Rotations are unsupported.");
         return false;
     }
     if (immediate) {
@@ -97,7 +100,7 @@ bool USSETranslatorVisitor::vbw(
         src2 = load(inst.opr.src2, 0b0001, src2_repeat_offset);
 
         if (src2 == spv::NoResult) {
-       //     LOG_ERROR("Source 2 not loaded");
+            RDCERR("Source 2 not loaded");
             return false;
         }
 
@@ -114,7 +117,7 @@ bool USSETranslatorVisitor::vbw(
     case Opcode::AND: operation = spv::Op::OpBitwiseAnd; break;
     case Opcode::XOR: operation = spv::Op::OpBitwiseXor; break;
     case Opcode::ROL:
-      //  LOG_WARN("Bitwise Rotate Left operation unsupported.");
+        RDCWARN("Bitwise Rotate Left operation unsupported.");
         return false; // TODO: SPIRV doesn't seem to have a rotate left operation!
     case Opcode::ASR: operation = spv::Op::OpShiftRightArithmetic; break;
     case Opcode::SHL: operation = spv::Op::OpShiftLeftLogical; break;
@@ -129,9 +132,14 @@ bool USSETranslatorVisitor::vbw(
 
     store(inst.opr.dest, result, 0b0001, dest_repeat_offset);
 
-   // LOG_DISASM("{:016x}: {}{} {} {} {}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode),
-   //     disasm::operand_to_str(inst.opr.dest, 0b0001, dest_repeat_offset), disasm::operand_to_str(inst.opr.src1, 0b0001, src1_repeat_offset),
-   //     immediate ? log_hex(value) : disasm::operand_to_str(inst.opr.src2, 0b0001, src2_repeat_offset));
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr;
+    LOG_DISASM("%s: %s%s %s %s %s", format.str().c_str(), disasm::e_predicate_str(pred),
+               disasm::opcode_str(inst.opcode).c_str(),
+               disasm::operand_to_str(inst.opr.dest, 0b0001, dest_repeat_offset).c_str(),
+               disasm::operand_to_str(inst.opr.src1, 0b0001, src1_repeat_offset).c_str(),
+               immediate ? std::to_string(value).c_str()
+                         : disasm::operand_to_str(inst.opr.src2, 0b0001, src2_repeat_offset).c_str());
 
     END_REPEAT()
 
@@ -204,7 +212,7 @@ bool USSETranslatorVisitor::i8mad(
     inst.opr.src2.swizzle = src2_swizz;
 
     if ((amod0) || (amod1) || (amod2) || (cmod0) || (cmod1) || (cmod2)) {
-       // LOG_ERROR("Custom modifiers for components not handled!");
+        RDCERR("Custom modifiers for components not handled!");
     }
 
     BEGIN_REPEAT(repeat_count);
@@ -286,12 +294,18 @@ bool USSETranslatorVisitor::i8mad(
     inst.opr.src0.swizzle[1] = add_swizz_rgb[1];
     inst.opr.src0.swizzle[2] = add_swizz_rgb[2];
 
-    //LOG_DISASM("{:016x}: {}{} {} {} {} {}({}, {})", m_instr, disasm::s_predicate_str(static_cast<usse::ShortPredicate>(pred)),
-   //     disasm::opcode_str(inst.opcode), disasm::operand_to_str(inst.opr.dest, 0b1111, dest_repeat_offset),
-     //   disasm::operand_to_str(inst.opr.src1, 0b1111, src1_repeat_offset),
-   //     disasm::operand_to_str(inst.opr.src2, 0b1111, src2_repeat_offset),
-   //    src0_neg ? "-" : "", disasm::operand_to_str((add_swizz_rgb_src0 ? inst.opr.src0 : inst.opr.src1), 0b0111, src0_repeat_offset),
-   //     disasm::operand_to_str(asel0 ? inst.opr.src1 : inst.opr.src0, 0b1000, src0_repeat_offset));
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr;
+    LOG_DISASM(
+        "%s: %s%s %s %s %s %s(%s, %s)", format.str().c_str(),
+        disasm::s_predicate_str(static_cast<usse::ShortPredicate>(pred)),
+        disasm::opcode_str(inst.opcode).c_str(),
+        disasm::operand_to_str(inst.opr.dest, 0b1111, dest_repeat_offset).c_str(),
+        disasm::operand_to_str(inst.opr.src1, 0b1111, src1_repeat_offset).c_str(),
+        disasm::operand_to_str(inst.opr.src2, 0b1111, src2_repeat_offset).c_str(), src0_neg ? "-" : "",
+        disasm::operand_to_str((add_swizz_rgb_src0 ? inst.opr.src0 : inst.opr.src1), 0b0111,
+                               src0_repeat_offset).c_str(),
+        disasm::operand_to_str(asel0 ? inst.opr.src1 : inst.opr.src0, 0b1000, src0_repeat_offset).c_str());
 
     END_REPEAT();
 
@@ -299,12 +313,12 @@ bool USSETranslatorVisitor::i8mad(
 }
 
 bool USSETranslatorVisitor::i8mad2() {
-  //  LOG_DISASM("Unimplmenet Opcode: i8mad2");
+    LOG_DISASM("Unimplmenet Opcode: i8mad2");
     return true;
 }
 
 bool USSETranslatorVisitor::i16mad() {
-  //  LOG_DISASM("Unimplmenet Opcode: i16mad");
+    LOG_DISASM("Unimplmenet Opcode: i16mad");
     return true;
 }
 
@@ -379,9 +393,10 @@ bool USSETranslatorVisitor::i32mad(
     if (add_result != spv::NoResult) {
         store(inst.opr.dest, add_result, 0b1, 0);
     }
-
-   // LOG_DISASM("{:016x}: {}{} {} {} {} {}", m_instr, disasm::s_predicate_str(pred), "IMAD2", disasm::operand_to_str(inst.opr.dest, 0b1),
-   //     disasm::operand_to_str(inst.opr.src0, 0b1), disasm::operand_to_str(inst.opr.src1, 0b1), disasm::operand_to_str(inst.opr.src2, 0b1));
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr;
+    RDCLOG("%s: %s%s %s %s %s %s", format.str().c_str(), disasm::s_predicate_str(pred), "IMAD2", disasm::operand_to_str(inst.opr.dest, 0b1),
+        disasm::operand_to_str(inst.opr.src0, 0b1), disasm::operand_to_str(inst.opr.src1, 0b1), disasm::operand_to_str(inst.opr.src2, 0b1));
     return true;
 }
 
@@ -447,9 +462,14 @@ bool USSETranslatorVisitor::i32mad2(
     } else {
         store(inst.opr.dest, vsrc2, 0b1, 0);
     }
-
-   // LOG_DISASM("{:016x}: {}{} {} {} {} {} [sn={}]", m_instr, disasm::e_predicate_str(pred), "IMAD", disasm::operand_to_str(inst.opr.dest, 0b1),
-   //     disasm::operand_to_str(inst.opr.src0, 0b1), disasm::operand_to_str(inst.opr.src1, 0b1), disasm::operand_to_str(inst.opr.src2, 0b1), sn);
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr;
+    LOG_DISASM("%s: %s%s %s %s %s %s [sn=%" PRIu8 "]", format.str().c_str(),
+               disasm::e_predicate_str(pred), "IMAD",
+               disasm::operand_to_str(inst.opr.dest, 0b1).c_str(),
+               disasm::operand_to_str(inst.opr.src0, 0b1).c_str(),
+               disasm::operand_to_str(inst.opr.src1, 0b1).c_str(),
+               disasm::operand_to_str(inst.opr.src2, 0b1).c_str(), sn);
 
     return true;
 }

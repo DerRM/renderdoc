@@ -1222,6 +1222,18 @@ void ShaderViewer::disassemble_typeChanged(int index)
   QString targetStr = m_DisassemblyType->currentText();
   QByteArray target = targetStr.toUtf8();
 
+  std::string name = targetStr.toStdString();
+  (void)name;
+
+  if(targetStr == QString::fromStdString("USSE (Assembly)"))
+  {
+    m_DisassemblyView->setReadOnly(false);
+    SetTextAndUpdateMargin0(m_DisassemblyView, m_ShaderDetails->debugInfo.files[0].contents);
+    m_DisassemblyView->setReadOnly(true);
+    m_DisassemblyView->emptyUndoBuffer();
+    return;
+  }
+
   for(const ShaderProcessingTool &disasm : m_Ctx.Config().ShaderProcessors)
   {
     if(targetStr == targetName(disasm))

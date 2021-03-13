@@ -25,6 +25,8 @@
 #include <3rdparty/glslang/SPIRV/GLSL.std.450.h>
 #include <3rdparty/glslang/SPIRV/SpvBuilder.h>
 
+#include <common/common.h>
+
 using namespace shader;
 using namespace usse;
 
@@ -126,7 +128,7 @@ bool USSETranslatorVisitor::smp(
     Imm7 src2_n) {
     // LOD mode: none, bias, replace, gradient
     if (lod_mode != 0 || dim + 1 != 2) {
-       // LOG_ERROR("Sampler LOD custom mode not implemented!");
+        RDCERR("Sampler LOD custom mode not implemented!");
         return true;
     }
 
@@ -156,8 +158,8 @@ bool USSETranslatorVisitor::smp(
     // Base 0, turn it to base 1
     dim += 1;
 
-  //  LOG_DISASM("{:016x}: {}SMP{}d.{}.{} {} {} {}", m_instr, disasm::e_predicate_str(pred), dim, disasm::data_type_str(inst.opr.dest.type), disasm::data_type_str(inst.opr.src0.type),
-  //      disasm::operand_to_str(inst.opr.dest, 0b0001), disasm::operand_to_str(inst.opr.src0, 0b0011), disasm::operand_to_str(inst.opr.src1, 0b0000));
+    RDCLOG("%#" PRIx64 ": %sSMP%" PRIu8 "d.%s.%s %s %s %s", m_instr, disasm::e_predicate_str(pred), dim, disasm::data_type_str(inst.opr.dest.type), disasm::data_type_str(inst.opr.src0.type),
+        disasm::operand_to_str(inst.opr.dest, 0b0001), disasm::operand_to_str(inst.opr.src0, 0b0011), disasm::operand_to_str(inst.opr.src1, 0b0000));
 
     m_b.setLine(m_recompiler.cur_pc);
 
@@ -166,7 +168,7 @@ bool USSETranslatorVisitor::smp(
     const spv::Id coord = load(inst.opr.src0, 0b0011);
 
     if (coord == spv::NoResult) {
-      //  LOG_ERROR("Coord not loaded");
+        RDCERR("Coord not loaded");
         return false;
     }
 
@@ -174,7 +176,7 @@ bool USSETranslatorVisitor::smp(
     if (m_spirv_params.samplers.count(inst.opr.src1.num)) {
         sampler = m_spirv_params.samplers.at(inst.opr.src1.num);
     } else {
-      //  LOG_ERROR("Can't get the sampler (sampler doesn't exist!)");
+        RDCERR("Can't get the sampler (sampler doesn't exist!)");
         return true;
     }
 
@@ -194,7 +196,7 @@ bool USSETranslatorVisitor::smp(
         break;
     }
     default: {
-      //  LOG_ERROR("Unsupported sb_mode: {}", sb_mode);
+        RDCERR("Unsupported sb_mode: %" PRIu8, sb_mode);
     }
     }
 

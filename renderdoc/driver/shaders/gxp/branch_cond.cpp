@@ -21,6 +21,10 @@
 #include "shader/usse_types.h"
 //#include <util/log.h>
 
+#include <iomanip>
+
+#include <common/common.h>
+
 using namespace shader;
 using namespace usse;
 
@@ -236,7 +240,7 @@ bool USSETranslatorVisitor::vtst(
     Opcode test_op = decode_test_inst(alu_sel, alu_op, prec, load_data_type);
 
     if (test_op == Opcode::INVALID) {
-      //  LOG_ERROR("Unsupported comparision: {} {}", alu_sel, alu_op);
+        RDCERR("Unsupported comparision: %" PRIu8 " %" PRIu8, alu_sel, alu_op);
         return false;
     }
 
@@ -342,14 +346,24 @@ bool USSETranslatorVisitor::vtst(
     m_b.setLine(m_recompiler.cur_pc);
 
     if (is_sub_opcode(test_op)) {
-        //LOG_DISASM("{:016x}: {}{}.{}.{} p{} {} {}", m_instr, disasm::e_predicate_str(pred), "CMP", used_comp_str, disasm::data_type_str(load_data_type),
-        //    pdst_n, disasm::operand_to_str(inst.opr.src1, load_mask), disasm::operand_to_str(inst.opr.src2, load_mask));
+        std::stringstream format;
+        format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr;
+        LOG_DISASM("%s: %s%s.%s.%s p%" PRIu8 " %s %s", format.str().c_str(),
+                   disasm::e_predicate_str(pred), "CMP", used_comp_str,
+                   disasm::data_type_str(load_data_type), pdst_n,
+                   disasm::operand_to_str(inst.opr.src1, load_mask).c_str(),
+                   disasm::operand_to_str(inst.opr.src2, load_mask).c_str());
 
         lhs = load(inst.opr.src1, load_mask);
         rhs = load(inst.opr.src2, load_mask);
     } else {
-        //LOG_DISASM("{:016x}: {}{}.{}zero.{} p{} {} {}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(test_op), used_comp_str, disasm::data_type_str(load_data_type),
-        //    pdst_n, disasm::operand_to_str(inst.opr.src1, load_mask), disasm::operand_to_str(inst.opr.src2, load_mask));
+        std::stringstream format;
+        format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr;
+        LOG_DISASM("%s: %s%s.%szero.%s p%" PRIu8 " %s %s", format.str().c_str(),
+                   disasm::e_predicate_str(pred), disasm::opcode_str(test_op).c_str(),
+                   used_comp_str, disasm::data_type_str(load_data_type), pdst_n,
+                   disasm::operand_to_str(inst.opr.src1, load_mask).c_str(),
+                   disasm::operand_to_str(inst.opr.src2, load_mask).c_str());
 
         lhs = do_alu_op(inst, load_mask);
 
@@ -410,7 +424,7 @@ bool USSETranslatorVisitor::vtstmsk(
     Imm4 alu_op,
     Imm7 src1_n,
     Imm7 src2_n) {
-   // LOG_ERROR("VTSTMASK unimplemented!");
+    RDCERR("VTSTMASK unimplemented!");
     return true;
 }
 
@@ -436,7 +450,9 @@ bool USSETranslatorVisitor::br(
 
     auto cur_pc = m_recompiler.cur_pc;
 
-    //LOG_DISASM("{:016x}: {}{} #{}", m_instr, disasm::e_predicate_str(pred), (br_type == 0) ? "BA" : "BR", br_off + cur_pc);
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr;
+    LOG_DISASM("%s: %s%s #%" PRIu32, format.str().c_str(), disasm::e_predicate_str(pred), (br_type == 0) ? "BA" : "BR", br_off + cur_pc);
     spv::Function *br_block = m_recompiler.get_or_recompile_block(m_recompiler.avail_blocks[br_off + cur_pc]);
 
     m_b.setLine(m_recompiler.cur_pc);
@@ -461,7 +477,7 @@ bool USSETranslatorVisitor::br(
         pred_v = load(pred_opr, 0b0001);
 
         if (pred_v == spv::NoResult) {
-           // LOG_ERROR("Pred not loaded");
+            RDCERR("Pred not loaded");
             return false;
         }
 

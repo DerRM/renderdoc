@@ -18,7 +18,7 @@
 #include "shader/usse_decoder_helpers.h"
 #include "shader/usse_types.h"
 
-//#include "util/log.h"
+#include <common/common.h>
 
 namespace shader::usse {
 
@@ -86,7 +86,7 @@ static RegisterBank decode_dest_bank(Imm2 dest_bank, bool bank_ext) {
         case 2: return RegisterBank::PRIMATTR;
         case 3: return RegisterBank::INDEXED1;
         }
-    //LOG_ERROR("Invalid dest_bank");
+    RDCERR("Invalid dest_bank");
     return RegisterBank::INVALID;
 }
 
@@ -101,7 +101,7 @@ static RegisterBank decode_src0_bank(Imm2 src0_bank, Imm1 bank_ext) {
         case 0: return RegisterBank::TEMP;
         case 1: return RegisterBank::PRIMATTR;
         }
-    //LOG_ERROR("Invalid src0_bank");
+    RDCERR("Invalid src0_bank");
     return RegisterBank::INVALID;
 }
 
@@ -121,7 +121,7 @@ static RegisterBank decode_src12_bank(Imm2 src12_bank, Imm1 bank_ext) {
         case 2: return RegisterBank::PRIMATTR;
         case 3: return RegisterBank::SECATTR;
         }
-    //LOG_ERROR("Invalid src12_bank");
+    RDCERR("Invalid src12_bank");
     return RegisterBank::INVALID;
 }
 

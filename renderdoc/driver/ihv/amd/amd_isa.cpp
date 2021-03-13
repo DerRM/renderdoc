@@ -108,6 +108,11 @@ void GetTargets(GraphicsAPI api, rdcarray<rdcstr> &targets)
     primary = ShaderEncoding::SPIRV;
     secondary = ShaderEncoding::SPIRV;
   }
+  else if(api == GraphicsAPI::GXM)
+  {
+    primary = ShaderEncoding::SPIRV;
+    secondary = ShaderEncoding::SPIRV;
+  }
 
   if(IsSupported(primary) || IsSupported(secondary))
   {

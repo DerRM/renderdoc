@@ -156,7 +156,7 @@ public:
 
   GXMDebugManager *GetDebugManager() { return m_DebugManager; }
   rdcarray<BufferDescription> GetBuffers();
-  rdcarray<rdcarray<uint8_t>> GetShaders();
+  //rdcarray<rdcarray<uint8_t>> GetShaders();
 
 private:
   void AddEvent();
@@ -204,7 +204,7 @@ private:
   rdcarray<BufferDescription> m_buffers;
   uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
-  rdcarray<rdcarray<uint8_t>> m_shaders;
+  std::map<ResourceId, ShaderReflection> m_shaders;
 
 public:
   IMPLEMENT_FUNCTION_SERIALISED(int, sceGxmInitialize, const SceGxmInitializeParams *params);

@@ -27,6 +27,8 @@
 
 #include <numeric>
 
+#include <common/common.h>
+
 using namespace shader;
 using namespace usse;
 
@@ -174,14 +176,22 @@ bool USSETranslatorVisitor::vmov(
             expr = "!=";
             break;
         }
-        //conditional_str = fmt::format(" ({} {} vec(0)) ?", disasm::operand_to_str(inst.opr.src0, dest_mask), expr);
+        conditional_str = " (" + disasm::operand_to_str(inst.opr.src0, dest_mask) + " " + expr + "  vec(0)) ?";
     }
 
-    //const std::string disasm_str = fmt::format("{:016x}: {}{}.{} {}{} {} {}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode), disasm::data_type_str(move_data_type),
-    //    disasm::operand_to_str(inst.opr.dest, dest_mask, dest_repeat_offset), conditional_str, disasm::operand_to_str(inst.opr.src1, dest_mask, src1_repeat_offset),
-    //    is_conditional ? fmt::format(": {}", disasm::operand_to_str(inst.opr.src2, dest_mask, src2_repeat_offset)) : "");
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr << ": "
+           << disasm::e_predicate_str(pred) << disasm::opcode_str(inst.opcode) << ","
+           << disasm::data_type_str(move_data_type) << " "
+           << disasm::operand_to_str(inst.opr.dest, dest_mask, dest_repeat_offset) << conditional_str
+           << " " << disasm::operand_to_str(inst.opr.src1, dest_mask, src1_repeat_offset) << " "
+           << (is_conditional
+                   ? (": " + disasm::operand_to_str(inst.opr.src2, dest_mask, src2_repeat_offset))
+                   : "");
 
-   // LOG_DISASM(disasm_str);
+    std::string disasm_str = format.str();
+
+    LOG_DISASM("%s", disasm_str.c_str());
 
     spv::Id source_to_compare_with_0 = spv::NoResult;
     spv::Id source_1 = load(inst.opr.src1, dest_mask, src1_repeat_offset);
@@ -189,7 +199,7 @@ bool USSETranslatorVisitor::vmov(
     spv::Id result = spv::NoResult;
 
     if (source_1 == spv::NoResult) {
-     //   LOG_ERROR("Source not Loaded");
+        RDCERR("Source not Loaded");
         return false;
     }
 
@@ -250,7 +260,7 @@ bool USSETranslatorVisitor::vmov(
             }
 
             default: {
-               // LOG_ERROR("Unknown compare method: {}", static_cast<int>(compare_method));
+                RDCERR("Unknown compare method: %" PRIi32, static_cast<int>(compare_method));
                 return false;
             }
             }
@@ -390,7 +400,10 @@ bool USSETranslatorVisitor::vpck(
 
     inst.opcode = op_table[dest_fmt][src_fmt];
 
-    //std::string disasm_str = fmt::format("{:016x}: {}{}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode));
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr << ": "
+           << disasm::e_predicate_str(pred) << disasm::opcode_str(inst.opcode);
+    std::string disasm_str = format.str();
 
     inst.opr.dest.type = dest_data_type_table[dest_fmt];
     inst.opr.src1.type = src_data_type_table[src_fmt];
@@ -409,7 +422,7 @@ bool USSETranslatorVisitor::vpck(
     inst.opr.src2 = decode_src12(inst.opr.src2, src2_n, src2_bank_sel, src2_bank_ext, true, 7, m_second_program);
 
     if (inst.opr.dest.bank == RegisterBank::SPECIAL || inst.opr.src0.bank == RegisterBank::SPECIAL || inst.opr.src1.bank == RegisterBank::SPECIAL || inst.opr.src2.bank == RegisterBank::SPECIAL) {
-       // LOG_WARN("Special regs unsupported");
+        RDCWARN("Special regs unsupported");
         return false;
     }
 
@@ -483,19 +496,22 @@ bool USSETranslatorVisitor::vpck(
     GET_REPEAT(inst, RepeatMode::SLMSI);
 
     if (should_use_src2) {
-        // TODO correctly log
-       // LOG_DISASM("{} {} ({} {}) [{}]", disasm_str, disasm::operand_to_str(inst.opr.dest, dest_mask, dest_repeat_offset),
-       //     disasm::operand_to_str(inst.opr.src1, dest_mask, src1_repeat_offset),
-       //     disasm::operand_to_str(inst.opr.src2, 0b1111, src2_repeat_offset), scale ? "scale" : "noscale");
+      LOG_DISASM("%s %s (%s %s) [%s]", disasm_str.c_str(),
+                 disasm::operand_to_str(inst.opr.dest, dest_mask, dest_repeat_offset).c_str(),
+                 disasm::operand_to_str(inst.opr.src1, dest_mask, src1_repeat_offset).c_str(),
+                 disasm::operand_to_str(inst.opr.src2, 0b1111, src2_repeat_offset).c_str(),
+                 scale ? "scale" : "noscale");
     } else {
-       // LOG_DISASM("{} {} {} [{}]", disasm_str, disasm::operand_to_str(inst.opr.dest, dest_mask, dest_repeat_offset),
-       //     disasm::operand_to_str(inst.opr.src1, dest_mask, src1_repeat_offset), scale ? "scale" : "noscale");
+      LOG_DISASM("%s %s %s [%s]", disasm_str.c_str(),
+                 disasm::operand_to_str(inst.opr.dest, dest_mask, dest_repeat_offset).c_str(),
+                 disasm::operand_to_str(inst.opr.src1, dest_mask, src1_repeat_offset).c_str(),
+                 scale ? "scale" : "noscale");
     }
 
     spv::Id source = load(inst.opr.src1, dest_mask, src1_repeat_offset);
 
     if (source == spv::NoResult) {
-       // LOG_ERROR("Source not loaded");
+        RDCERR("Source not loaded");
         return false;
     }
 
@@ -606,10 +622,14 @@ bool USSETranslatorVisitor::vldst(
     inst.opr.src1.type = DataType::INT32;
     inst.opr.src2.type = DataType::INT32;
 
-    //std::string disasm_str = fmt::format("{:016x}: {}{}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode));
-    //LOG_DISASM("{} {} ({} + {} + {}) [{} bytes]", disasm_str, disasm::operand_to_str(to_store, 0b1, 0),
-    //    disasm::operand_to_str(inst.opr.src0, 0b1, 0),
-    //    disasm::operand_to_str(inst.opr.src1, 0b1, 0), disasm::operand_to_str(inst.opr.src2, 0b1, 0), total_bytes_fo_fetch);
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr << ": "
+           << disasm::e_predicate_str(pred) << disasm::opcode_str(inst.opcode);
+    LOG_DISASM("%s %s (%s + %s + %s) [%" PRIi32 " bytes]", format.str().c_str(),
+               disasm::operand_to_str(to_store, 0b1, 0).c_str(),
+               disasm::operand_to_str(inst.opr.src0, 0b1, 0).c_str(),
+               disasm::operand_to_str(inst.opr.src1, 0b1, 0).c_str(),
+               disasm::operand_to_str(inst.opr.src2, 0b1, 0).c_str(), total_bytes_fo_fetch);
 
     // TODO: is source_2 in word or byte? Is it even used at all?
     spv::Id source_0 = load(inst.opr.src0, 0b1, 0);

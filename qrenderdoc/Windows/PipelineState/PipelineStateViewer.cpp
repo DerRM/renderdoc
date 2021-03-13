@@ -1185,6 +1185,7 @@ bool PipelineStateViewer::SaveShaderFile(const ShaderReflection *shader)
     case ShaderEncoding::GLSL: filter = tr("GLSL files (*.glsl)"); break;
     case ShaderEncoding::SPIRV: filter = tr("SPIR-V files (*.spv)"); break;
     case ShaderEncoding::SPIRVAsm: filter = tr("SPIR-V assembly files (*.spvasm)"); break;
+    case ShaderEncoding::USSE: filter = tr("USSE assembly files (*.gxp)"); break;
     case ShaderEncoding::Unknown:
     case ShaderEncoding::Count: filter = tr("All files (*.*)"); break;
   }

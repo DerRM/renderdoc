@@ -17,7 +17,6 @@
 
 #include "shader/usse_translator_entry.h"
 
-#include "gxm/types.h"
 #include "shader/decoder_detail.h"
 #include "shader/matcher.h"
 #include "shader/usse_disasm.h"
@@ -30,6 +29,10 @@
 
 #include <optional>
 #include <map>
+
+#include <driver/shaders/gxp/gxm/types.h>
+
+#include <common/common.h>
 
 namespace shader::usse {
 
@@ -820,7 +823,7 @@ spv::Function *USSERecompiler::get_or_recompile_block(const usse::USSEBlock &blo
     const auto last_pc = cur_pc;
 
     if (block.size > 0) {
-        LOG_TRACE("Recompiling block_% " PRIu32 ", size = %" PRIu32 ", id = %" PRIu32 "\n", block.offset, block.size, ret_func->getId());
+        RDCLOG("Recompiling block_% " PRIu32 ", size = %" PRIu32 ", id = %" PRIu32, block.offset, block.size, ret_func->getId());
 
         cache.emplace(block.offset, ret_func);
         const usse::USSEOffset pc_end = block.offset + block.size - 1;

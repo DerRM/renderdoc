@@ -2,7 +2,8 @@
 #include "shader/gxp_parser.h"
 #include "shader/usse_program_analyzer.h"
 #include "util/align.h"
-//#include <util/log.h>
+
+#include <common/common.h>
 
 using namespace shader::usse;
 
@@ -167,7 +168,7 @@ ProgramInput shader::get_program_input(const SceGxmProgram &program) {
             break;
         }
         default: {
-            //LOG_CRITICAL("Unknown parameter type used in shader.");
+            RDCFATAL("Unknown parameter type used in shader.");
             break;
         }
         }

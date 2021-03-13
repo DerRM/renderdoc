@@ -1652,6 +1652,7 @@ enum class ShaderEncoding : uint32_t
   SPIRV,
   SPIRVAsm,
   HLSL,
+  USSE,
   Count,
 };
 

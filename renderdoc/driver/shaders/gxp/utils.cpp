@@ -30,6 +30,8 @@
 
 #include <bitset>
 
+#include <common/common.h>
+
 using namespace shader;
 using namespace usse;
 
@@ -57,7 +59,7 @@ spv::Id USSETranslatorVisitor::swizzle_to_spv_comp(spv::Id composite, spv::Id ty
     case SwizzleChannel::_H: break;
     }
 
-    //LOG_WARN("Swizzle channel {} unsupported", static_cast<Imm4>(swizzle));
+    RDCWARN("Swizzle channel %" PRIu8 " unsupported", static_cast<Imm4>(swizzle));
     return spv::NoResult;
 }
 

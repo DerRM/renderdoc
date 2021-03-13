@@ -8,6 +8,8 @@
 
 #include <bitset>
 
+#include <common/common.h>
+
 using namespace shader::usse;
 
 static spv::Id get_correspond_constant_with_channel(spv::Builder &b, shader::usse::SwizzleChannel swizz) {
@@ -464,7 +466,7 @@ spv::Id shader::usse::utils::unpack_one(spv::Builder &b, SpirvUtilFunctions &uti
         return b.createFunctionCall(utils.unpack_fx8, { scalar });
     }
     default: {
-        LOG_ERROR("Unsupported unpack type: %s\n", log_hex(type).c_str());
+        RDCERR("Unsupported unpack type: %s", log_hex(type).c_str());
         break;
     }
     }
@@ -499,7 +501,7 @@ spv::Id shader::usse::utils::pack_one(spv::Builder &b, SpirvUtilFunctions &utils
     }
 
     default: {
-        LOG_ERROR("Unsupported pack type: %s\n", log_hex(source_type).c_str());
+        RDCERR("Unsupported pack type: %s", log_hex(source_type).c_str());
         break;
     }
     }
@@ -898,7 +900,7 @@ spv::Id shader::usse::utils::unpack(spv::Builder &b, SpirvUtilFunctions &utils, 
 void shader::usse::utils::store(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFunctions &utils, const FeatureState &features, Operand dest,
     spv::Id source, std::uint8_t dest_mask, int off) {
     if (source == spv::NoResult) {
-        LOG_WARN("Source invalid");
+        RDCWARN("Source invalid");
         return;
     }
 
@@ -937,12 +939,12 @@ void shader::usse::utils::store(spv::Builder &b, const SpirvShaderParameters &pa
     }
 
     if (is_float_data_type(dest.type) && (b.isIntType(source_elm_type_id) || b.isUintType(source_elm_type_id))) {
-        LOG_CRITICAL("Trying to store float to int storage");
+        RDCFATAL("Trying to store float to int storage");
         return;
     }
 
     if (!is_float_data_type(dest.type) && !b.isIntType(source_elm_type_id) && !b.isUintType(source_elm_type_id)) {
-        LOG_CRITICAL("Trying to store int to float storage");
+        RDCFATAL("Trying to store int to float storage");
         return;
     }
 

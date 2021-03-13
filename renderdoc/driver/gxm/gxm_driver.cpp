@@ -31,6 +31,9 @@
 #include "gxm_replay.h"
 #include "gxm_vk_shader_cache.h"
 
+#include <driver/shaders/gxp/shader/spirv_recompiler.h>
+#include <driver/shaders/gxp/gxm/types.h>
+
 void WrappedGXM::StartFrameCapture(void *dev, void *wnd) {}
 
 bool WrappedGXM::EndFrameCapture(void *dev, void *wnd)
@@ -360,8 +363,63 @@ bool WrappedGXM::Serialise_InitShaderResources(SerialiserType &ser)
   const void *programData;
   SERIALISE_ELEMENT_ARRAY(programData, program_size + (4 - (program_size % 4)));
   rdcarray<uint8_t> data;
-  data.assign((const uint8_t*)programData, program_size + (4 - (program_size % 4)));
-  m_shaders.push_back(data);
+  data.assign((const uint8_t *)programData, program_size + (4 - (program_size % 4)));
+  //m_shaders.push_back(data);
+
+  const SceGxmProgram &program = *(const SceGxmProgram *)programData;
+
+  ShaderReflection shaderRefl = {};
+
+
+  auto printmySpirv = [&](const std::string &ext, const std::string &dump) -> bool
+  {
+    RDCLOG("%s", dump.c_str());
+
+    ShaderSourceFile file = {};
+    file.contents.assign(dump.c_str());
+
+    shaderRefl.debugInfo.encoding = ShaderEncoding::USSE;
+    shaderRefl.debugInfo.files.push_back(file);
+    return true;
+  };
+
+  FeatureState features;
+  shader::usse::SpirvCode spirv = shader::convert_gxp_to_spirv(program, "shader", features, nullptr, false, false, printmySpirv);
+
+  VkShaderModuleCreateInfo shaderInfo = {};
+  shaderInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+  shaderInfo.pCode = spirv.data();
+  shaderInfo.codeSize = spirv.size() * 4;
+
+  VkShaderModule shaderModule;
+  VkResult result = vkCreateShaderModule(m_vulkanState.m_Device, &shaderInfo, NULL, &shaderModule);
+
+  if(result != VK_SUCCESS)
+  {
+    RDCERR("vkCreateShaderModule failed");
+  }
+
+  GXMResource index_res = ShaderRes(shaderModule);
+  ResourceId live = m_ResourceManager->RegisterResource(index_res);
+  GetResourceManager()->AddLiveResource(shader, index_res);
+  AddResource(shader, ResourceType::Shader, "Shader");
+
+  shaderRefl.resourceId = shader;
+  shaderRefl.encoding = ShaderEncoding::SPIRV;
+  shaderRefl.rawBytes.assign(rdcarray(reinterpret_cast<uint8_t*>(spirv.data()), spirv.size() * 4));
+
+  if(program.is_vertex())
+  {
+    shaderRefl.entryPoint = "main_vs";
+    shaderRefl.stage = ShaderStage::Vertex;
+  }
+  else if(program.is_fragment())
+  {
+    shaderRefl.entryPoint = "main_fs";
+    shaderRefl.stage = ShaderStage::Fragment;
+  }
+
+  m_shaders[live] = shaderRefl;
 
   return true;
 }
@@ -791,11 +849,6 @@ rdcarray<BufferDescription> WrappedGXM::GetBuffers()
   return m_buffers;
 }
 
-rdcarray<rdcarray<uint8_t>> WrappedGXM::GetShaders()
-{
-  return m_shaders;
-}
-
 ReplayStatus WrappedGXM::Initialise()
 {
   uint32_t count = 0;
@@ -830,7 +883,7 @@ ReplayStatus WrappedGXM::Initialise()
       RDCLOG("Enabling VK_EXT_debug_report");
     enabledExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
   }
-
+  
   rdcarray<const char *> strExtensions(enabledExtensions.size());
   for(uint32_t strExtIndex = 0; strExtIndex < enabledExtensions.size(); ++strExtIndex)
   {
@@ -879,7 +932,7 @@ ReplayStatus WrappedGXM::Initialise()
   }
 
   VkApplicationInfo appinfo = {
-      VK_STRUCTURE_TYPE_APPLICATION_INFO, NULL, "GXM Driver", 1, "GXM", 1, VK_MAKE_VERSION(1, 0, 0),
+      VK_STRUCTURE_TYPE_APPLICATION_INFO, NULL, "GXM Driver", 1, "GXM", 1, VK_MAKE_VERSION(1, 1, 0),
   };
 
   VkInstanceCreateInfo instinfo = {
@@ -958,6 +1011,14 @@ ReplayStatus WrappedGXM::Initialise()
 
   rdcarray<rdcstr> enabledDeviceExtensions;
   AddRequiredExtensions(false, enabledDeviceExtensions, supportedDeviceExtensions);
+
+  if(supportedDeviceExtensions.find(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME) != supportedDeviceExtensions.end() &&
+     !enabledDeviceExtensions.contains(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME))
+  {
+    if(!m_Replay->IsRemoteProxy())
+      RDCLOG("Enabling VK_KHR_vulkan_memory_model");
+    enabledDeviceExtensions.push_back(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME);
+  }
 
   rdcarray<const char *> strDeviceExtensions(enabledDeviceExtensions.size());
   for(uint32_t strExtIndex = 0; strExtIndex < enabledDeviceExtensions.size(); ++strExtIndex)

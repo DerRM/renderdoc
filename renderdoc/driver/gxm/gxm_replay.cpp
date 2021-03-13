@@ -37,6 +37,9 @@
 #define VULKAN 1
 #include "data/glsl/glsl_ubos_cpp.h"
 
+static const char *USSEAssemblyTarget = "USSE (Assembly)";
+
+
 ReplayStatus GXMReplay::ReadLogInitialisation(RDCFile *rdc, bool storeStructuredBuffers)
 {
   return m_pDriver->ReadLogInitialisation(rdc, storeStructuredBuffers);
@@ -123,7 +126,7 @@ void GXMReplay::BuildTargetShader(ShaderEncoding sourceEncoding, const bytebuf &
 
 rdcarray<ShaderEncoding> GXMReplay::GetTargetShaderEncodings()
 {
-  return rdcarray<ShaderEncoding>();
+  return {ShaderEncoding::GLSL, ShaderEncoding::SPIRV, ShaderEncoding::USSE};
 }
 
 void GXMReplay::ReplaceResource(ResourceId from, ResourceId to) {}
@@ -1422,23 +1425,48 @@ rdcarray<DebugMessage> GXMReplay::GetDebugMessages()
 
 rdcarray<ShaderEntryPoint> GXMReplay::GetShaderEntryPoints(ResourceId shader)
 {
-  return rdcarray<ShaderEntryPoint>();
+  if(m_pDriver->m_shaders.find(shader) == m_pDriver->m_shaders.end())
+    return {};
+
+  ShaderReflection &shaderRefl = m_pDriver->m_shaders[shader];
+
+  if(shaderRefl.resourceId == ResourceId())
+  {
+    RDCERR("Can't get shader details without successful reflect");
+    return {};
+  }
+
+  return {{shaderRefl.entryPoint, shaderRefl.stage}};
 }
 
 ShaderReflection *GXMReplay::GetShader(ResourceId pipeline, ResourceId shader, ShaderEntryPoint entry)
 {
-  return nullptr;
+  auto &reflection = m_pDriver->m_shaders[shader];
+
+  if(reflection.resourceId == ResourceId())
+  {
+    RDCERR("Can't get shader details without successful reflect");
+    return NULL;
+  }
+
+  return &reflection;
 }
 
 rdcarray<rdcstr> GXMReplay::GetDisassemblyTargets()
 {
-  return rdcarray<rdcstr>();
+  return {USSEAssemblyTarget};
 }
 
 rdcstr GXMReplay::DisassembleShader(ResourceId pipeline, const ShaderReflection *refl,
                                     const rdcstr &target)
 {
-  return rdcstr();
+  auto it = m_pDriver->m_shaders.find(
+      m_pDriver->GetResourceManager()->GetLiveID(refl->resourceId));
+
+  if(it == m_pDriver->m_shaders.end())
+    return "; Invalid Shader Specified";
+
+  return StringFormat::Fmt("; Invalid disassembly target %s", target.c_str());
 }
 
 rdcarray<EventUsage> GXMReplay::GetUsage(ResourceId id)

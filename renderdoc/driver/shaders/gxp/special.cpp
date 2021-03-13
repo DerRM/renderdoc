@@ -25,6 +25,8 @@
 #include "shader/usse_types.h"
 #include "util/log.h"
 
+#include <common/common.h>
+
 using namespace shader;
 using namespace usse;
 
@@ -44,19 +46,25 @@ bool USSETranslatorVisitor::phas(
     Imm6 exe_addr_high,
     Imm7 src1_n_or_exe_addr_mid,
     Imm7 src2_n_or_exe_addr_low) {
-   // LOG_DISASM("{:016x}: PHAS", m_instr);
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr;
+    LOG_DISASM("%s: PHAS", format.str().c_str());
     return true;
 }
 
 bool USSETranslatorVisitor::nop() {
-   // LOG_DISASM("{:016x}: NOP", m_instr);
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr;
+    LOG_DISASM("%s: NOP", format.str().c_str());
     return true;
 }
 
 bool USSETranslatorVisitor::spec(
     bool special,
     SpecialCategory category) {
-  //  LOG_DISASM("{:016x}: SPEC category: {}, special: {}", m_instr, (uint8_t)category, special);
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr;
+    LOG_DISASM("%s: SPEC category: %" PRIu8 ", special: %s", format.str().c_str(), (uint8_t)category, special ? "true" : "false");
     return true;
 }
 
@@ -73,26 +81,28 @@ bool USSETranslatorVisitor::smlsi(
     Imm8 src0_inc,
     Imm8 src1_inc,
     Imm8 src2_inc) {
-    //std::string disasm_str = "{:016x}: SMLSI ";
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr;
+    std::string disasm_str = format.str() + ": SMLSI ";
 
     auto parse_increment = [&](const int idx, const Imm1 inc_mode, const Imm8 inc_value) {
         if (inc_mode) {
-            //disasm_str += "swizz.(";
+            disasm_str += "swizz.(";
 
             // Parse value as swizzle
             for (int i = 0; i < 4; i++) {
                 repeat_increase[idx][i] = ((inc_value >> (2 * i)) & 0b11);
-               // disasm_str += fmt::format("{}", repeat_increase[idx][i]);
+                disasm_str += std::to_string(repeat_increase[idx][i]);
             }
 
-           // disasm_str += ") ";
+            disasm_str += ") ";
         } else {
             // Parse value as immidiate
             for (int i = 0; i < 4; i++) {
                 repeat_increase[idx][i] = i * static_cast<std::int8_t>(inc_value);
             }
 
-            //disasm_str += fmt::format(" inc.{} ", static_cast<std::int8_t>(inc_value));
+            disasm_str += " inc." + std::to_string(static_cast<std::int8_t>(inc_value)) + " ";
         }
     };
 
@@ -101,14 +111,16 @@ bool USSETranslatorVisitor::smlsi(
     parse_increment(1, src1_inc_mode, src1_inc);
     parse_increment(2, src2_inc_mode, src2_inc);
 
-  //  LOG_DISASM(disasm_str, m_instr);
+    LOG_DISASM("%s", disasm_str.c_str());
 
     return true;
 }
 
 bool USSETranslatorVisitor::kill(
     ShortPredicate pred) {
-  //  LOG_DISASM("{:016x}: KILL {}", m_instr, disasm::s_predicate_str(pred));
+    std::stringstream format;
+    format << "0x" << std::setfill('0') << std::setw(16) << std::hex << m_instr;
+    LOG_DISASM("%s: KILL %s", format.str().c_str(), disasm::s_predicate_str(pred));
 
     auto cur_pc = m_recompiler.cur_pc;
 
@@ -136,7 +148,7 @@ bool USSETranslatorVisitor::kill(
         pred_v = load(pred_opr, 0b0001);
 
         if (pred_v == spv::NoResult) {
-            LOG_ERROR("Pred not loaded");
+            RDCERR("Pred not loaded");
             return false;
         }
 
